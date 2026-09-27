@@ -8,22 +8,22 @@ export default {
   theme: {
     extend: {
       colors: {
-        brand: {
-          50: '#eef2ff',
-          100: '#e0e7ff',
-          200: '#c7d2fe',
-          300: '#a5b4fc',
-          400: '#818cf8',
-          500: '#6366f1',
-          600: '#4f46e5',
-          700: '#4338ca',
-          800: '#3730a3',
-          900: '#312e81',
-          950: '#1e1b4b',
+        cyber: {
+          950: '#070a0f',
+          900: '#0b111e',
+          800: '#111c30',
+          700: '#1b2b48',
+          600: '#263d66',
+          cyan: '#00f2fe',
+          blue: '#4facfe',
+          ice: '#38bdf8',
+          accent: '#06b6d4',
+          danger: '#f43f5e',
+          warning: '#f59e0b',
+          success: '#10b981'
         }
       },
       fontFamily: {
-        sans: ['Plus Jakarta Sans', 'Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
         mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace']
       }
     },

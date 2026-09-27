@@ -1,298 +1,323 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Server, Laptop, Shield, Network, Globe, Activity, KeyRound, 
-  Plus, RefreshCw, ChevronDown, CheckCircle2, AlertCircle, ArrowUpRight
+  Compass, 
+  Layers, 
+  Server, 
+  Smartphone, 
+  Zap, 
+  ShieldCheck, 
+  Globe,
+  CheckCircle2
 } from 'lucide-react';
-import { api, NetworkData, DeviceData } from './lib/api';
-import { MachinesTable } from './components/MachinesTable';
-import { MachineDrawer } from './components/MachineDrawer';
-import { AccessControlsView } from './components/AccessControlsView';
-import { SubnetsRoutingView } from './components/SubnetsRoutingView';
-import { AppConnectorsView } from './components/AppConnectorsView';
-import { TopologyView } from './components/TopologyView';
-import { SettingsView } from './components/SettingsView';
-import { AddMachineModal } from './components/AddMachineModal';
+import { api, DeviceData, TopologyData } from './lib/api';
+import { TopologyHUD } from './components/TopologyHUD';
+import { NetworkAxisView } from './components/NetworkAxisView';
+import { HardwareAxisView } from './components/HardwareAxisView';
+import { MobileWAPView } from './components/MobileWAPView';
+import { TrafficBugfixDemo } from './components/TrafficBugfixDemo';
 
-export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'machines' | 'acl' | 'subnets' | 'connectors' | 'topology' | 'settings'>('machines');
-  const [networks, setNetworks] = useState<NetworkData[]>([]);
-  const [selectedNetwork, setSelectedNetwork] = useState<NetworkData | null>(null);
+export function App() {
+  const [activeTab, setActiveTab] = useState<'topology' | 'network' | 'hardware' | 'wap' | 'bugfix'>('topology');
   const [devices, setDevices] = useState<DeviceData[]>([]);
-  const [selectedDevice, setSelectedDevice] = useState<DeviceData | null>(null);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type?: 'info' | 'success' } | null>(null);
+  const [topology, setTopology] = useState<TopologyData | null>(null);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-  const showToast = (message: string, type: 'info' | 'success' = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3500);
   };
 
+  // Load data from live Hub
   const loadData = async () => {
-    setIsRefreshing(true);
     try {
-      const [nets, devs] = await Promise.all([
-        api.getNetworks(),
-        api.getDevices()
-      ]);
-      setNetworks(nets);
-      if (nets.length > 0 && !selectedNetwork) {
-        setSelectedNetwork(nets[0]);
-      }
+      const devs = await api.getDevices();
       setDevices(devs);
-      // Update selectedDevice if already open
-      if (selectedDevice) {
-        const updated = devs.find(d => d.id === selectedDevice.id);
-        if (updated) setSelectedDevice(updated);
-      }
-    } finally {
-      setIsRefreshing(false);
+      const topo = await api.getTopology('net_corp_zero_trust');
+      setTopology(topo);
+    } catch {
+      // Handled inside api.ts
     }
   };
 
   useEffect(() => {
     loadData();
-    // Poll every 8 seconds for background synchronization
-    const timer = setInterval(() => {
-      api.getDevices().then(setDevices);
-    }, 8000);
-    return () => clearInterval(timer);
+    const interval = setInterval(loadData, 5000);
+    return () => clearInterval(interval);
   }, []);
 
-  const networkId = selectedNetwork?.id || 'net_corp_zero_trust';
+  // Handle instant pause/resume toggle (<10ms optimistic UI update)
+  const handleToggleIntent = async (deviceId: string, currentIntent: string) => {
+    const nextIntent = currentIntent === 'ACTIVE' ? 'USER_PAUSED' : 'ACTIVE';
+    
+    // Instant optimistic update
+    setDevices(prev => prev.map(d => d.id === deviceId ? { ...d, userIntent: nextIntent } : d));
+    if (topology) {
+      setTopology({
+        ...topology,
+        nodes: topology.nodes.map(n => n.id === deviceId ? { ...n, userIntent: nextIntent } : n)
+      });
+    }
 
-  const navItems = [
-    { id: 'machines', label: '设备清单', icon: Server, badge: devices.length },
-    { id: 'acl', label: '访问控制', icon: Shield },
-    { id: 'subnets', label: '子网与路由', icon: Network },
-    { id: 'connectors', label: '应用连接器', icon: Globe },
-    { id: 'topology', label: '网络拓扑', icon: Activity },
-    { id: 'settings', label: '设置与部署', icon: KeyRound }
-  ] as const;
+    showToast(nextIntent === 'USER_PAUSED' 
+      ? `节点 ${deviceId.slice(0, 10)} 已即时置为预期休眠 (PAUSED)，网关已阻断心跳强拉！` 
+      : `节点 ${deviceId.slice(0, 10)} 已恢复网络连接 (ACTIVE)。`
+    );
+
+    if (currentIntent === 'ACTIVE') {
+      await api.pauseDevice(deviceId, 'net_corp_zero_trust');
+    } else {
+      await api.resumeDevice(deviceId, 'net_corp_zero_trust');
+    }
+    loadData();
+  };
+
+  // Handle Admin Instant Revocation ("一键毫秒踢人")
+  const handleRevoke = async (deviceId: string) => {
+    if (!confirm('确定要毫秒级吊销该设备的所有零信任凭证与 Peer 隧道吗？此操作将立即断开设备。')) {
+      return;
+    }
+
+    setDevices(prev => prev.map(d => d.id === deviceId ? { ...d, userIntent: 'ADMIN_DISABLED' } : d));
+    if (topology) {
+      setTopology({
+        ...topology,
+        nodes: topology.nodes.map(n => n.id === deviceId ? { ...n, userIntent: 'ADMIN_DISABLED' } : n)
+      });
+    }
+    showToast(`已成功吊销设备 ${deviceId} 的全部证书与 Peer 连接！`);
+    await api.revokeDevice(deviceId);
+    loadData();
+  };
+
+  // Handle switching persona (Workstation <-> Server)
+  const handleSwitchPersona = async (deviceId: string, currentPersona: string) => {
+    const targetPersona = currentPersona === 'SERVER_HEADLESS' ? 'WORKSTATION_INTERACTIVE' : 'SERVER_HEADLESS';
+    const success = await api.updateDevicePersona(deviceId, targetPersona);
+    if (success) {
+      showToast(`已将节点画像切换为：${targetPersona === 'SERVER_HEADLESS' ? '机房无头服务器 (3.5s自愈)' : '工作站终端 (人权第一)'}`);
+      loadData();
+    } else {
+      alert('切换画像失败，请重试');
+    }
+  };
+
+  // Handle unregistering/deleting node
+  const handleDeleteNode = async (deviceId: string) => {
+    if (!confirm(`确定要从网络注销并删除节点 ${deviceId} 吗？`)) return;
+    const success = await api.deleteDevice(deviceId);
+    if (success) {
+      showToast(`节点 ${deviceId} 已成功注销删除。`);
+      loadData();
+    } else {
+      alert('删除失败，请重试');
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
-      
-      {/* Toast Alert Banner */}
-      {toast && (
-        <div className="fixed top-4 right-4 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl bg-slate-900 text-white shadow-xl text-xs font-medium border border-slate-700 animate-slide-in-right">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>{toast.message}</span>
-        </div>
-      )}
-
-      {/* Global Top Header Bar (Tailscale / Cloudflare style) */}
-      <header className="sticky top-0 z-30 bg-white border-b border-slate-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            
-            {/* Left: Brand & Network Selector */}
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-200">
-                  <Activity className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-base tracking-tight text-slate-900">Autopilot</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-bold border border-indigo-200">
-                      EasyTier Zero-Trust
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Network Dropdown */}
-              <div className="hidden sm:flex items-center gap-2 pl-4 border-l border-slate-200">
-                <div className="text-xs text-slate-500 font-medium">当前网络:</div>
-                <div className="relative">
-                  <select
-                    value={selectedNetwork?.id || ''}
-                    onChange={(e) => {
-                      const net = networks.find(n => n.id === e.target.value);
-                      if (net) setSelectedNetwork(net);
-                    }}
-                    className="appearance-none pl-3 pr-8 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs font-semibold font-mono text-slate-800 hover:bg-slate-100 transition focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  >
-                    {networks.map(n => (
-                      <option key={n.id} value={n.id}>
-                        {n.name} ({n.id})
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-              </div>
+    <div className="min-h-screen flex flex-col font-sans text-slate-800 bg-slate-50/60 selection:bg-sky-100 selection:text-sky-900">
+      {/* Top Tactical Navigation Header */}
+      <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/85 backdrop-blur-xl shadow-2xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          
+          {/* Logo & Slogan */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 via-blue-600 to-indigo-600 flex items-center justify-center shadow-md shadow-sky-500/20 text-white">
+              <Compass className="w-5 h-5 stroke-[2.2]" />
             </div>
-
-            {/* Right: Status Pill & Actions */}
-            <div className="flex items-center gap-3">
-              {/* Central Hub Status */}
-              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-xs text-slate-600">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>中枢就绪</span>
-                <span className="text-slate-400">•</span>
-                <span className="font-mono text-[11px] text-slate-500">3.5s 心跳</span>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-bold font-mono tracking-wider bg-gradient-to-r from-sky-600 via-blue-700 to-indigo-700 bg-clip-text text-transparent">
+                  AUTOPILOT
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200 font-bold">
+                  v1.0 ZERO-TRUST
+                </span>
               </div>
-
-              {/* Refresh button */}
-              <button
-                onClick={loadData}
-                disabled={isRefreshing}
-                className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-slate-200 transition"
-                title="刷新数据"
-              >
-                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              </button>
-
-              {/* Add Machine Button */}
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm transition active:scale-95"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                添加设备
-              </button>
+              <p className="text-[11px] text-slate-500 font-mono tracking-tight">
+                From Cockpit to Autopilot • 现代化 EasyTier 零信任控制平面
+              </p>
             </div>
-
           </div>
 
-          {/* Primary Navigation Tabs */}
-          <div className="flex overflow-x-auto space-x-1 sm:space-x-4 border-t border-slate-100 pt-1 -mb-px">
-            {navItems.map(item => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  className={`flex items-center gap-2 px-3 sm:px-4 py-3 text-xs font-semibold border-b-2 transition whitespace-nowrap ${
-                    isActive
-                      ? 'border-indigo-600 text-indigo-600'
-                      : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`} />
-                  <span>{item.label}</span>
-                  {'badge' in item && typeof item.badge === 'number' && (
-                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                      isActive ? 'bg-indigo-100 text-indigo-700 font-bold' : 'bg-slate-100 text-slate-600'
-                    }`}>
-                      {item.badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+          {/* Navigation Tabs */}
+          <nav className="hidden md:flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-2xl border border-slate-200 font-mono text-xs">
+            <button
+              onClick={() => setActiveTab('topology')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-medium transition ${
+                activeTab === 'topology'
+                  ? 'bg-white text-sky-700 border border-slate-200 shadow-2xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              }`}
+            >
+              <Compass className="w-4 h-4 text-sky-600" />
+              战情 HUD 拓扑
+            </button>
+            <button
+              onClick={() => setActiveTab('network')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-medium transition ${
+                activeTab === 'network'
+                  ? 'bg-white text-sky-700 border border-slate-200 shadow-2xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              }`}
+            >
+              <Layers className="w-4 h-4 text-sky-600" />
+              组织网络轴
+            </button>
+            <button
+              onClick={() => setActiveTab('hardware')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-medium transition ${
+                activeTab === 'hardware'
+                  ? 'bg-white text-sky-700 border border-slate-200 shadow-2xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              }`}
+            >
+              <Server className="w-4 h-4 text-sky-600" />
+              硬件机器轴
+            </button>
+            <button
+              onClick={() => setActiveTab('wap')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-medium transition ${
+                activeTab === 'wap'
+                  ? 'bg-white text-sky-700 border border-slate-200 shadow-2xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              }`}
+            >
+              <Smartphone className="w-4 h-4 text-sky-600" />
+              移动端 WAP
+            </button>
+            <button
+              onClick={() => setActiveTab('bugfix')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-medium transition ${
+                activeTab === 'bugfix'
+                  ? 'bg-white text-amber-700 border border-slate-200 shadow-2xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              }`}
+            >
+              <Zap className="w-4 h-4 text-amber-500" />
+              12.4 MB/s 修复验算
+            </button>
+          </nav>
+
+          {/* Edge Health Status Pill */}
+          <div className="flex items-center gap-2 text-xs font-mono">
+            <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 font-medium">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>D1 Edge SSOT: Active</span>
+            </div>
           </div>
 
         </div>
       </header>
 
+      {/* Global Interactive Notification Toast */}
+      {toastMsg && (
+        <div className="sticky top-16 z-50 max-w-7xl mx-auto px-4 w-full pt-2">
+          <div className="p-3.5 rounded-2xl bg-sky-600 text-white font-mono text-xs flex items-center justify-between shadow-lg shadow-sky-600/20 animate-in slide-in-from-top-2">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-sky-200 shrink-0" />
+              <span>{toastMsg}</span>
+            </div>
+            <button onClick={() => setToastMsg(null)} className="text-sky-200 hover:text-white">✕</button>
+          </div>
+        </div>
+      )}
+
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'machines' && (
-          <MachinesTable
-            devices={devices}
-            networkId={networkId}
-            onSelectDevice={(device) => setSelectedDevice(device)}
-            onAddMachine={() => setShowAddModal(true)}
-            onRefresh={loadData}
-            onToast={showToast}
-          />
-        )}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Mobile Tab Select Dropdown (visible on small screens) */}
+        <div className="block md:hidden mb-4">
+          <select
+            value={activeTab}
+            onChange={(e) => setActiveTab(e.target.value as any)}
+            className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2 font-mono text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/30 shadow-2xs"
+          >
+            <option value="topology">战情 HUD 拓扑</option>
+            <option value="network">组织网络轴</option>
+            <option value="hardware">硬件机器轴</option>
+            <option value="wap">移动端 WAP 控制台</option>
+            <option value="bugfix">12.4 MB/s 修复验算实验室</option>
+          </select>
+        </div>
 
-        {activeTab === 'acl' && (
-          <AccessControlsView
-            networkId={networkId}
-            onToast={showToast}
-          />
-        )}
-
-        {activeTab === 'subnets' && (
-          <SubnetsRoutingView
-            network={selectedNetwork}
-            devices={devices}
-            onRefresh={loadData}
-            onToast={showToast}
-          />
-        )}
-
-        {activeTab === 'connectors' && (
-          <AppConnectorsView
-            networkId={networkId}
-            devices={devices}
-            onToast={showToast}
-          />
-        )}
-
+        {/* Tab Panels */}
         {activeTab === 'topology' && (
-          <TopologyView
-            networkId={networkId}
-            onSelectDevice={(device) => setSelectedDevice(device)}
-            devices={devices}
+          <div className="space-y-6">
+            <TopologyHUD
+              topology={topology}
+              onToggleIntent={handleToggleIntent}
+              onRevoke={handleRevoke}
+              onSwitchPersona={handleSwitchPersona}
+              onDeleteNode={handleDeleteNode}
+            />
+
+            {/* Quick Status Bar */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 rounded-2xl glass-panel flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+                  <ShieldCheck className="w-5 h-5 shrink-0" />
+                </div>
+                <div>
+                  <div className="text-xs font-mono text-slate-500">Zero-Trust Guardrails</div>
+                  <div className="text-sm font-semibold text-slate-800">宿主底层网卡绝对受保 • 纯内存 RPC 释放</div>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl glass-panel flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-amber-50 text-amber-600 border border-amber-100">
+                  <Zap className="w-5 h-5 shrink-0" />
+                </div>
+                <div>
+                  <div className="text-xs font-mono text-slate-500">Local Latency & Sync</div>
+                  <div className="text-sm font-semibold text-slate-800">&lt; 10ms 乐观响应 • 30~50ms 带外写入 D1</div>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl glass-panel flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-sky-50 text-sky-600 border border-sky-100">
+                  <Globe className="w-5 h-5 shrink-0" />
+                </div>
+                <div>
+                  <div className="text-xs font-mono text-slate-500">Dual Persona Governance</div>
+                  <div className="text-sm font-semibold text-slate-800">机房无头自愈 (3.5s) • 终端秒断秒连人权第一</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'network' && (
+          <NetworkAxisView
+            network={topology?.network}
+            onRefresh={loadData}
           />
         )}
 
-        {activeTab === 'settings' && (
-          <SettingsView
-            network={selectedNetwork}
-            onToast={showToast}
+        {activeTab === 'hardware' && (
+          <HardwareAxisView
+            devices={devices}
+            onToggleIntent={handleToggleIntent}
+            onRevoke={handleRevoke}
+            onRefresh={loadData}
           />
+        )}
+
+        {activeTab === 'wap' && (
+          <MobileWAPView
+            devices={devices}
+            onToggleIntent={handleToggleIntent}
+          />
+        )}
+
+        {activeTab === 'bugfix' && (
+          <TrafficBugfixDemo />
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="bg-white border-t border-slate-200 mt-auto py-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <div className="flex items-center gap-3">
-            <span className="font-semibold text-slate-700">Autopilot Control Plane</span>
-            <span>•</span>
-            <span>From Cockpit to Autopilot</span>
-            <span>•</span>
-            <span>EasyTier 现代化零信任控制平面与客户端生态</span>
-          </div>
-          <div className="flex items-center gap-4 text-slate-600">
-            <span>双栈 ULA IPv6 规范</span>
-            <span>•</span>
-            <span>元控制内存 RPC 接管</span>
-            <span>•</span>
-            <a 
-              href="https://github.com/EasyTier/EasyTier" 
-              target="_blank" 
-              rel="noreferrer"
-              className="text-indigo-600 hover:text-indigo-700 flex items-center gap-1 font-medium"
-            >
-              EasyTier 核心
-              <ArrowUpRight className="w-3 h-3" />
-            </a>
-          </div>
-        </div>
+      {/* Clean Light Footer */}
+      <footer className="border-t border-slate-200 py-4 mt-auto bg-white/70 backdrop-blur-md font-mono text-xs text-slate-500 text-center">
+        Autopilot 零信任现代化控制平面 • Cloudflare 边缘架构与本地同构 • EasyTier 原生 IPC/RPC 引擎
       </footer>
-
-      {/* Side Slide-Over Drawer for Selected Machine */}
-      {selectedDevice && (
-        <MachineDrawer
-          device={selectedDevice}
-          networkId={networkId}
-          onClose={() => setSelectedDevice(null)}
-          onRefresh={loadData}
-          onToast={showToast}
-        />
-      )}
-
-      {/* Add Machine Modal */}
-      {showAddModal && (
-        <AddMachineModal
-          network={selectedNetwork}
-          onClose={() => setShowAddModal(false)}
-          onSuccess={(msg) => {
-            showToast(msg);
-            loadData();
-          }}
-        />
-      )}
-
     </div>
   );
-};
+}
+
