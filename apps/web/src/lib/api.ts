@@ -38,32 +38,6 @@ export interface NetworkData {
   createdAt: number;
 }
 
-export interface ACLRuleData {
-  id: string;
-  networkId: string;
-  priority: number;
-  name: string;
-  action: 'ALLOW' | 'DENY';
-  sourceTags: string[];
-  destTags: string[];
-  protocol: string;
-  destPorts: number[];
-  description?: string;
-  enabled?: boolean;
-}
-
-export interface AppConnectorData {
-  id: string;
-  networkId: string;
-  deviceId?: string;
-  domainPattern: string;
-  assignedCidr32: string;
-  targetHost: string;
-  targetPort?: number;
-  technitiumSynced: boolean;
-  enabled?: boolean;
-}
-
 export interface TopologyData {
   network: NetworkData;
   nodes: Array<{
@@ -73,7 +47,6 @@ export interface TopologyData {
     shape: 'CIRCLE' | 'HEXAGON' | 'DIAMOND';
     persona?: 'SERVER_HEADLESS' | 'WORKSTATION_INTERACTIVE';
     userIntent?: 'ACTIVE' | 'USER_PAUSED' | 'ADMIN_DISABLED';
-    publicKeyX25519?: string;
     virtualIpv4?: string;
     virtualIpv6?: string;
     os?: string;
@@ -242,25 +215,12 @@ class AutopilotApi {
       const res = await fetch(`${this.baseURL}/api/v1/networks`);
       if (res.ok) {
         const data = await res.json();
-        return data.networks?.length > 0 ? data.networks : DEFAULT_NETWORKS;
+        return data.networks.length > 0 ? data.networks : DEFAULT_NETWORKS;
       }
     } catch {
-      // Fallback
+      // Standalone preview fallback
     }
     return DEFAULT_NETWORKS;
-  }
-
-  async updateNetwork(networkId: string, data: { name?: string; ipv4Cidr?: string; ipv6Cidr?: string }): Promise<boolean> {
-    try {
-      const res = await fetch(`${this.baseURL}/api/v1/networks/${networkId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-      return res.ok;
-    } catch {
-      return false;
-    }
   }
 
   async getDevices(): Promise<DeviceData[]> {
@@ -268,61 +228,17 @@ class AutopilotApi {
       const res = await fetch(`${this.baseURL}/api/v1/devices`);
       if (res.ok) {
         const data = await res.json();
-        return data.devices?.length > 0 ? data.devices : DEFAULT_DEVICES;
+        return data.devices.length > 0 ? data.devices : DEFAULT_DEVICES;
       }
     } catch {
-      // Fallback
+      // Standalone preview fallback
     }
     return DEFAULT_DEVICES;
   }
 
-  async enrollDevice(deviceData: {
-    hostname: string;
-    persona: 'SERVER_HEADLESS' | 'WORKSTATION_INTERACTIVE';
-    publicKeyX25519: string;
-    networkId?: string;
-    tags?: string[];
-    geo?: any;
-  }): Promise<any> {
-    try {
-      const res = await fetch(`${this.baseURL}/api/v1/devices`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(deviceData)
-      });
-      return await res.json();
-    } catch (e: any) {
-      return { error: e.message };
-    }
-  }
-
-  async deleteDevice(deviceId: string): Promise<boolean> {
-    try {
-      const res = await fetch(`${this.baseURL}/api/v1/devices/${deviceId}`, {
-        method: 'DELETE'
-      });
-      return res.ok;
-    } catch {
-      return false;
-    }
-  }
-
-  async updateDevicePersona(deviceId: string, persona: 'SERVER_HEADLESS' | 'WORKSTATION_INTERACTIVE'): Promise<boolean> {
-    try {
-      const res = await fetch(`${this.baseURL}/api/v1/devices/${deviceId}/persona`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ persona })
-      });
-      return res.ok;
-    } catch {
-      return false;
-    }
-  }
-
   async pauseDevice(deviceId: string, networkId: string): Promise<boolean> {
     try {
-      const res = await fetch(`${this.baseURL}/api/v1/devices/${deviceId}/networks/${networkId}/pause?actor=ADMIN`, {
+      const res = await fetch(`${this.baseURL}/api/v1/devices/${deviceId}/networks/${networkId}/pause`, {
         method: 'POST'
       });
       return res.ok;
@@ -353,85 +269,6 @@ class AutopilotApi {
     }
   }
 
-  async getAclRules(networkId: string): Promise<ACLRuleData[]> {
-    try {
-      const res = await fetch(`${this.baseURL}/api/v1/networks/${networkId}/acl`);
-      if (res.ok) {
-        const data = await res.json();
-        return data.rules?.map((r: any) => ({
-          ...r,
-          sourceTags: typeof r.sourceTags === 'string' ? JSON.parse(r.sourceTags) : r.sourceTags,
-          destTags: typeof r.destTags === 'string' ? JSON.parse(r.destTags) : r.destTags,
-          destPorts: typeof r.destPorts === 'string' ? JSON.parse(r.destPorts) : r.destPorts
-        })) || [];
-      }
-    } catch {
-      // Fallback
-    }
-    return [];
-  }
-
-  async createAclRule(networkId: string, rule: any): Promise<boolean> {
-    try {
-      const res = await fetch(`${this.baseURL}/api/v1/networks/${networkId}/acl`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(rule)
-      });
-      return res.ok;
-    } catch {
-      return false;
-    }
-  }
-
-  async deleteAclRule(networkId: string, ruleId: string): Promise<boolean> {
-    try {
-      const res = await fetch(`${this.baseURL}/api/v1/networks/${networkId}/acl/${ruleId}`, {
-        method: 'DELETE'
-      });
-      return res.ok;
-    } catch {
-      return false;
-    }
-  }
-
-  async getConnectors(): Promise<AppConnectorData[]> {
-    try {
-      const res = await fetch(`${this.baseURL}/api/v1/connectors`);
-      if (res.ok) {
-        const data = await res.json();
-        return data.connectors || [];
-      }
-    } catch {
-      // Fallback
-    }
-    return [];
-  }
-
-  async createConnector(data: any): Promise<boolean> {
-    try {
-      const res = await fetch(`${this.baseURL}/api/v1/connectors`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-      return res.ok;
-    } catch {
-      return false;
-    }
-  }
-
-  async deleteConnector(connectorId: string): Promise<boolean> {
-    try {
-      const res = await fetch(`${this.baseURL}/api/v1/connectors/${connectorId}`, {
-        method: 'DELETE'
-      });
-      return res.ok;
-    } catch {
-      return false;
-    }
-  }
-
   async getTopology(networkId: string): Promise<TopologyData> {
     try {
       const res = await fetch(`${this.baseURL}/api/v1/networks/${networkId}/topology`);
@@ -459,7 +296,6 @@ class AutopilotApi {
         shape: d.tags.includes('gateway') ? 'HEXAGON' : 'CIRCLE',
         persona: d.persona,
         userIntent: d.userIntent,
-        publicKeyX25519: d.publicKeyX25519,
         virtualIpv4: d.networks[0]?.virtualIpv4,
         virtualIpv6: d.networks[0]?.virtualIpv6,
         os: d.os,

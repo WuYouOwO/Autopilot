@@ -383,3 +383,4 @@ export const HardwareAxisView: React.FC<HardwareAxisViewProps> = ({
     </div>
   );
 };
+
