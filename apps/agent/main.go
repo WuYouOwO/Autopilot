@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
 	"syscall"
 	"time"
@@ -132,6 +134,7 @@ func runDaemon(args []string) {
 			case <-ticker.C:
 				currentIntent := intentLock.GetState()
 				uptime := int64(time.Since(startTime).Seconds())
+				discoveredIP := getDiscoveredPublicIP(*rpcPort)
 
 				telemetry := map[string]interface{}{
 					"cpuUsagePercent":    5,
@@ -140,6 +143,7 @@ func runDaemon(args []string) {
 					"rxBytesTotal":       uptime * 1024 * 12,
 					"txBytesTotal":       uptime * 1024 * 8,
 					"status":             string(currentIntent),
+					"publicIp":           discoveredIP,
 				}
 
 				resp, err := hubClient.SendHeartbeat(ctx, activeDeviceID, telemetry)
@@ -237,3 +241,21 @@ func runStatus(args []string) {
 	fmt.Println("  EasyTier RPC Portal: 127.0.0.1:11211 (Active)")
 	fmt.Println("  Watchdog: Standby")
 }
+
+func getDiscoveredPublicIP(rpcPort int) string {
+	cmd := exec.Command("/usr/bin/easytier/easytier-linux-x86_64/easytier-cli", "-p", fmt.Sprintf("127.0.0.1:%d", rpcPort), "-o", "json", "node")
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	var nodeInfo struct {
+		StunInfo struct {
+			PublicIP []string `json:"public_ip"`
+		} `json:"stun_info"`
+	}
+	if err := json.Unmarshal(out, &nodeInfo); err == nil && len(nodeInfo.StunInfo.PublicIP) > 0 {
+		return nodeInfo.StunInfo.PublicIP[0]
+	}
+	return ""
+}
+
