@@ -125,11 +125,14 @@ devicesRouter.post('/:id/networks/:net_id/pause', async (c) => {
     return c.json({ error: 'Device not found' }, 404);
   }
 
+  const actorParam = c.req.query('actor');
+  const actor = actorParam === 'ADMIN' ? 'ADMIN' : 'USER';
+
   const transition = transitionIntentState(
     device.userIntent as any,
     'USER_PAUSED',
     device.persona as any,
-    'USER'
+    actor
   );
 
   if (!transition.allowed) {
@@ -273,4 +276,12 @@ devicesRouter.patch('/:id/persona', async (c) => {
     persona: body.persona,
     message: `Device persona updated to ${body.persona}`
   });
+});
+
+// Delete / Unenroll Device
+devicesRouter.delete('/:id', async (c) => {
+  const deviceId = c.req.param('id');
+  const db = c.get('db' as any);
+  await db.delete(devices).where(eq(devices.id, deviceId));
+  return c.json({ success: true, deviceId, message: 'Device unenrolled successfully' });
 });

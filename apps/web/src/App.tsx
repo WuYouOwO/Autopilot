@@ -6,7 +6,8 @@ import {
   Smartphone, 
   Zap, 
   ShieldCheck, 
-  Globe 
+  Globe,
+  CheckCircle2
 } from 'lucide-react';
 import { api, DeviceData, TopologyData } from './lib/api';
 import { TopologyHUD } from './components/TopologyHUD';
@@ -19,6 +20,12 @@ export function App() {
   const [activeTab, setActiveTab] = useState<'topology' | 'network' | 'hardware' | 'wap' | 'bugfix'>('topology');
   const [devices, setDevices] = useState<DeviceData[]>([]);
   const [topology, setTopology] = useState<TopologyData | null>(null);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3500);
+  };
 
   // Load data from live Hub
   const loadData = async () => {
@@ -28,7 +35,7 @@ export function App() {
       const topo = await api.getTopology('net_corp_zero_trust');
       setTopology(topo);
     } catch {
-      // Fallback handled inside api.ts
+      // Handled inside api.ts
     }
   };
 
@@ -41,6 +48,8 @@ export function App() {
   // Handle instant pause/resume toggle (<10ms optimistic UI update)
   const handleToggleIntent = async (deviceId: string, currentIntent: string) => {
     const nextIntent = currentIntent === 'ACTIVE' ? 'USER_PAUSED' : 'ACTIVE';
+    
+    // Instant optimistic update
     setDevices(prev => prev.map(d => d.id === deviceId ? { ...d, userIntent: nextIntent } : d));
     if (topology) {
       setTopology({
@@ -49,11 +58,17 @@ export function App() {
       });
     }
 
+    showToast(nextIntent === 'USER_PAUSED' 
+      ? `节点 ${deviceId.slice(0, 10)} 已即时置为预期休眠 (PAUSED)，网关已阻断心跳强拉！` 
+      : `节点 ${deviceId.slice(0, 10)} 已恢复网络连接 (ACTIVE)。`
+    );
+
     if (currentIntent === 'ACTIVE') {
       await api.pauseDevice(deviceId, 'net_corp_zero_trust');
     } else {
       await api.resumeDevice(deviceId, 'net_corp_zero_trust');
     }
+    loadData();
   };
 
   // Handle Admin Instant Revocation ("一键毫秒踢人")
@@ -69,13 +84,39 @@ export function App() {
         nodes: topology.nodes.map(n => n.id === deviceId ? { ...n, userIntent: 'ADMIN_DISABLED' } : n)
       });
     }
+    showToast(`已成功吊销设备 ${deviceId} 的全部证书与 Peer 连接！`);
     await api.revokeDevice(deviceId);
+    loadData();
+  };
+
+  // Handle switching persona (Workstation <-> Server)
+  const handleSwitchPersona = async (deviceId: string, currentPersona: string) => {
+    const targetPersona = currentPersona === 'SERVER_HEADLESS' ? 'WORKSTATION_INTERACTIVE' : 'SERVER_HEADLESS';
+    const success = await api.updateDevicePersona(deviceId, targetPersona);
+    if (success) {
+      showToast(`已将节点画像切换为：${targetPersona === 'SERVER_HEADLESS' ? '机房无头服务器 (3.5s自愈)' : '工作站终端 (人权第一)'}`);
+      loadData();
+    } else {
+      alert('切换画像失败，请重试');
+    }
+  };
+
+  // Handle unregistering/deleting node
+  const handleDeleteNode = async (deviceId: string) => {
+    if (!confirm(`确定要从网络注销并删除节点 ${deviceId} 吗？`)) return;
+    const success = await api.deleteDevice(deviceId);
+    if (success) {
+      showToast(`节点 ${deviceId} 已成功注销删除。`);
+      loadData();
+    } else {
+      alert('删除失败，请重试');
+    }
   };
 
   return (
     <div className="min-h-screen flex flex-col font-sans text-slate-800 bg-slate-50/60 selection:bg-sky-100 selection:text-sky-900">
-      {/* Top Tactical Navigation Header (Light Frosted Glass) */}
-      <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/85 backdrop-blur-xl shadow-xs">
+      {/* Top Tactical Navigation Header */}
+      <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/85 backdrop-blur-xl shadow-2xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           
           {/* Logo & Slogan */}
@@ -98,13 +139,13 @@ export function App() {
             </div>
           </div>
 
-          {/* Navigation Tabs (Light Pill Style) */}
+          {/* Navigation Tabs */}
           <nav className="hidden md:flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-2xl border border-slate-200 font-mono text-xs">
             <button
               onClick={() => setActiveTab('topology')}
               className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-medium transition ${
                 activeTab === 'topology'
-                  ? 'bg-white text-sky-700 border border-slate-200 shadow-xs font-semibold'
+                  ? 'bg-white text-sky-700 border border-slate-200 shadow-2xs font-semibold'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
               }`}
             >
@@ -115,7 +156,7 @@ export function App() {
               onClick={() => setActiveTab('network')}
               className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-medium transition ${
                 activeTab === 'network'
-                  ? 'bg-white text-sky-700 border border-slate-200 shadow-xs font-semibold'
+                  ? 'bg-white text-sky-700 border border-slate-200 shadow-2xs font-semibold'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
               }`}
             >
@@ -126,7 +167,7 @@ export function App() {
               onClick={() => setActiveTab('hardware')}
               className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-medium transition ${
                 activeTab === 'hardware'
-                  ? 'bg-white text-sky-700 border border-slate-200 shadow-xs font-semibold'
+                  ? 'bg-white text-sky-700 border border-slate-200 shadow-2xs font-semibold'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
               }`}
             >
@@ -137,7 +178,7 @@ export function App() {
               onClick={() => setActiveTab('wap')}
               className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-medium transition ${
                 activeTab === 'wap'
-                  ? 'bg-white text-sky-700 border border-slate-200 shadow-xs font-semibold'
+                  ? 'bg-white text-sky-700 border border-slate-200 shadow-2xs font-semibold'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
               }`}
             >
@@ -148,7 +189,7 @@ export function App() {
               onClick={() => setActiveTab('bugfix')}
               className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-medium transition ${
                 activeTab === 'bugfix'
-                  ? 'bg-white text-amber-700 border border-slate-200 shadow-xs font-semibold'
+                  ? 'bg-white text-amber-700 border border-slate-200 shadow-2xs font-semibold'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
               }`}
             >
@@ -168,6 +209,19 @@ export function App() {
         </div>
       </header>
 
+      {/* Global Interactive Notification Toast */}
+      {toastMsg && (
+        <div className="sticky top-16 z-50 max-w-7xl mx-auto px-4 w-full pt-2">
+          <div className="p-3.5 rounded-2xl bg-sky-600 text-white font-mono text-xs flex items-center justify-between shadow-lg shadow-sky-600/20 animate-in slide-in-from-top-2">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-sky-200 shrink-0" />
+              <span>{toastMsg}</span>
+            </div>
+            <button onClick={() => setToastMsg(null)} className="text-sky-200 hover:text-white">✕</button>
+          </div>
+        </div>
+      )}
+
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Mobile Tab Select Dropdown (visible on small screens) */}
@@ -175,7 +229,7 @@ export function App() {
           <select
             value={activeTab}
             onChange={(e) => setActiveTab(e.target.value as any)}
-            className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2 font-mono text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/30 shadow-xs"
+            className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2 font-mono text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/30 shadow-2xs"
           >
             <option value="topology">战情 HUD 拓扑</option>
             <option value="network">组织网络轴</option>
@@ -192,6 +246,8 @@ export function App() {
               topology={topology}
               onToggleIntent={handleToggleIntent}
               onRevoke={handleRevoke}
+              onSwitchPersona={handleSwitchPersona}
+              onDeleteNode={handleDeleteNode}
             />
 
             {/* Quick Status Bar */}
@@ -241,6 +297,7 @@ export function App() {
             devices={devices}
             onToggleIntent={handleToggleIntent}
             onRevoke={handleRevoke}
+            onRefresh={loadData}
           />
         )}
 

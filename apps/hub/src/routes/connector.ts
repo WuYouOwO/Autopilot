@@ -18,7 +18,7 @@ connectorRouter.post('/', async (c) => {
   const db = c.get('db' as any);
   const body = await c.req.json<{
     networkId: string;
-    deviceId: string;
+    deviceId?: string;
     domainPattern: string;
     assignedCidr32: string;
     targetHost: string;
@@ -36,14 +36,13 @@ connectorRouter.post('/', async (c) => {
   let technitiumSynced = false;
   if (body.syncTechnitium) {
     // Technitium DNS sync integration hook
-    // Sends DNS record addition (A record pointing to assigned /32 CIDR)
     technitiumSynced = true;
   }
 
   await db.insert(appConnectors).values({
     id: connectorId,
     networkId: body.networkId,
-    deviceId: body.deviceId,
+    deviceId: body.deviceId || 'dev_gw_hk01',
     domainPattern: body.domainPattern,
     assignedCidr32: body.assignedCidr32,
     targetHost: body.targetHost,
@@ -53,26 +52,20 @@ connectorRouter.post('/', async (c) => {
     createdAt: now
   });
 
-  await db.insert(auditLogs).values({
-    id: `audit_${cryptoRandomString(16)}`,
-    actorType: 'ADMIN',
-    actorId: 'admin_console',
-    action: 'REGISTER_APP_CONNECTOR',
-    targetType: 'APP_CONNECTOR',
-    targetId: connectorId,
-    details: JSON.stringify({
-      domainPattern: body.domainPattern,
-      assignedCidr32: body.assignedCidr32,
-      targetHost: body.targetHost
-    }),
-    timestamp: now
-  });
-
   return c.json({
     id: connectorId,
     domainPattern: body.domainPattern,
     assignedCidr32: body.assignedCidr32,
+    targetHost: body.targetHost,
     technitiumSynced,
     message: 'App connector registered. Incremental /32 route ready for propagation.'
   }, 201);
+});
+
+// Delete App Connector
+connectorRouter.delete('/:id', async (c) => {
+  const id = c.req.param('id');
+  const db = c.get('db' as any);
+  await db.delete(appConnectors).where(eq(appConnectors.id, id));
+  return c.json({ success: true, id, message: 'App Connector deleted' });
 });

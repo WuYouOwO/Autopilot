@@ -1,16 +1,21 @@
 import React, { useState } from 'react';
+import { Server, Laptop, ShieldCheck, ChevronRight } from 'lucide-react';
 import { DiagnosticInspectorModal } from './DiagnosticInspectorModal';
 
 interface TopologyHUDProps {
   topology: any;
   onToggleIntent: (nodeId: string, currentIntent: string) => void;
   onRevoke: (nodeId: string) => void;
+  onSwitchPersona?: (nodeId: string, currentPersona: string) => void;
+  onDeleteNode?: (nodeId: string) => void;
 }
 
 export const TopologyHUD: React.FC<TopologyHUDProps> = ({
   topology,
   onToggleIntent,
-  onRevoke
+  onRevoke,
+  onSwitchPersona,
+  onDeleteNode
 }) => {
   const [selectedNode, setSelectedNode] = useState<any | null>(null);
 
@@ -33,7 +38,8 @@ export const TopologyHUD: React.FC<TopologyHUDProps> = ({
     id: 'subnet_center',
     label: 'Autopilot SD-WAN Mesh',
     shape: 'DIAMOND',
-    virtualIpv4: '10.144.0.0/16'
+    virtualIpv4: '10.144.0.0/16',
+    virtualIpv6: 'fd00:cafe:2026::/64'
   };
 
   const deviceNodes = topology.nodes.filter((n: any) => n.shape !== 'DIAMOND');
@@ -58,7 +64,7 @@ export const TopologyHUD: React.FC<TopologyHUDProps> = ({
             </h3>
           </div>
           <p className="text-xs text-slate-500 font-mono mt-0.5">
-            零信任动态全息拓扑感知 • 点击节点开启下钻诊断与毫秒级断开/重连
+            零信任动态全息拓扑感知 • 点击画布中任意节点即可立即唤起诊断与启停控制
           </p>
         </div>
 
@@ -79,19 +85,17 @@ export const TopologyHUD: React.FC<TopologyHUDProps> = ({
         </div>
       </div>
 
-      {/* SVG Canvas (Light Blueprint Background) */}
+      {/* SVG Canvas (Light Blueprint Background with 100% Clickable Targets) */}
       <div className="relative w-full flex justify-center py-4 overflow-x-auto">
         <svg
           viewBox={`0 0 ${width} ${height}`}
           className="w-full max-w-4xl h-auto select-none"
         >
           <defs>
-            {/* Linear gradients for light beam */}
             <linearGradient id="lightBeamGrad" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stopColor="#0284c7" stopOpacity="0.85" />
               <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.3" />
             </linearGradient>
-            {/* Subtle shadow filter */}
             <filter id="nodeShadow" x="-20%" y="-20%" width="140%" height="140%">
               <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.1" floodColor="#0f172a" />
             </filter>
@@ -133,8 +137,11 @@ export const TopologyHUD: React.FC<TopologyHUDProps> = ({
           <g
             transform={`translate(${centerX}, ${centerY})`}
             className="cursor-pointer group"
+            style={{ cursor: 'pointer' }}
             onClick={() => setSelectedNode(subnetNode)}
           >
+            {/* Extended transparent hit area */}
+            <circle r="45" fill="transparent" pointerEvents="all" />
             <polygon
               points="0,-36 36,0 0,36 -36,0"
               fill="#f0f9ff"
@@ -150,6 +157,7 @@ export const TopologyHUD: React.FC<TopologyHUDProps> = ({
               fontSize="10"
               fontWeight="bold"
               fontFamily="monospace"
+              pointerEvents="none"
             >
               SUBNET
             </text>
@@ -160,6 +168,7 @@ export const TopologyHUD: React.FC<TopologyHUDProps> = ({
               fontSize="11"
               fontWeight="bold"
               fontFamily="monospace"
+              pointerEvents="none"
             >
               {subnetNode.virtualIpv4 || '10.144.0.0/16'}
             </text>
@@ -184,11 +193,14 @@ export const TopologyHUD: React.FC<TopologyHUDProps> = ({
                 key={node.id}
                 transform={`translate(${node.x}, ${node.y})`}
                 className="cursor-pointer group"
+                style={{ cursor: 'pointer' }}
                 onClick={() => setSelectedNode(node)}
               >
+                {/* 100% Clickable Transparent Hit Area */}
+                <circle r="40" fill="transparent" pointerEvents="all" />
+
                 {/* Node shape */}
                 {isGateway ? (
-                  // Hexagon (⬡)
                   <polygon
                     points="0,-24 20.7,-12 20.7,12 0,24 -20.7,12 -20.7,-12"
                     fill={fillColor}
@@ -198,7 +210,6 @@ export const TopologyHUD: React.FC<TopologyHUDProps> = ({
                     className="group-hover:scale-110 transition-transform duration-200"
                   />
                 ) : (
-                  // Circle (○)
                   <circle
                     r="22"
                     fill={fillColor}
@@ -217,6 +228,7 @@ export const TopologyHUD: React.FC<TopologyHUDProps> = ({
                   fontSize="11.5"
                   fontWeight="600"
                   fontFamily="sans-serif"
+                  pointerEvents="none"
                 >
                   {node.label}
                 </text>
@@ -226,6 +238,7 @@ export const TopologyHUD: React.FC<TopologyHUDProps> = ({
                   fill="#64748b"
                   fontSize="10"
                   fontFamily="monospace"
+                  pointerEvents="none"
                 >
                   {node.virtualIpv4 || 'Auto IP'}
                 </text>
@@ -244,6 +257,35 @@ export const TopologyHUD: React.FC<TopologyHUDProps> = ({
         </svg>
       </div>
 
+      {/* Quick Node Cards Bar (Direct Clickable Nodes Alternative) */}
+      <div className="pt-4 border-t border-slate-200">
+        <div className="text-xs font-mono font-semibold text-slate-500 mb-2">
+          快捷节点列表 (点击卡片亦可直接呼出下钻诊断面板)：
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {positionedNodes.map((node: any) => {
+            const isServer = node.persona === 'SERVER_HEADLESS';
+            const isActive = node.userIntent === 'ACTIVE';
+            const isPaused = node.userIntent === 'USER_PAUSED';
+
+            return (
+              <button
+                key={`quick_${node.id}`}
+                onClick={() => setSelectedNode(node)}
+                className="px-3 py-1.5 rounded-xl bg-white hover:bg-sky-50 border border-slate-200 hover:border-sky-300 text-xs font-mono flex items-center gap-2 transition shadow-2xs text-left"
+              >
+                <span className={`w-2 h-2 rounded-full ${
+                  isActive ? 'bg-emerald-500' : isPaused ? 'bg-amber-500' : 'bg-rose-500'
+                }`} />
+                <span className="font-semibold text-slate-800">{node.label}</span>
+                <span className="text-slate-400 text-[10px]">({node.virtualIpv4 || 'Auto'})</span>
+                <ChevronRight className="w-3 h-3 text-slate-400" />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Drill-Down Diagnostic Inspector Modal */}
       {selectedNode && (
         <DiagnosticInspectorModal
@@ -256,6 +298,18 @@ export const TopologyHUD: React.FC<TopologyHUDProps> = ({
           onRevoke={(nodeId) => {
             onRevoke(nodeId);
             setSelectedNode(null);
+          }}
+          onSwitchPersona={(nodeId, persona) => {
+            if (onSwitchPersona) {
+              onSwitchPersona(nodeId, persona);
+              setSelectedNode(null);
+            }
+          }}
+          onDeleteNode={(nodeId) => {
+            if (onDeleteNode) {
+              onDeleteNode(nodeId);
+              setSelectedNode(null);
+            }
           }}
         />
       )}

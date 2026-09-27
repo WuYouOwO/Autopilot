@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { networks, deviceNetworks, devices, aclRules, appConnectors } from '../db/schema.js';
 import { cryptoRandomString } from '../utils.js';
 import { AppEnv } from '../types.js';
@@ -52,8 +52,32 @@ networksRouter.post('/', async (c) => {
   }, 201);
 });
 
+// Update Network Configuration (e.g. update IPv4 / IPv6 CIDR)
+networksRouter.patch('/:id', async (c) => {
+  const networkId = c.req.param('id');
+  const db = c.get('db' as any);
+  const body = await c.req.json<{
+    name?: string;
+    ipv4Cidr?: string;
+    ipv6Cidr?: string;
+  }>();
+
+  const updateData: any = { updatedAt: Date.now() };
+  if (body.name) updateData.name = body.name;
+  if (body.ipv4Cidr) updateData.ipv4Cidr = body.ipv4Cidr;
+  if (body.ipv6Cidr !== undefined) updateData.ipv6Cidr = body.ipv6Cidr;
+
+  await db.update(networks).set(updateData).where(eq(networks.id, networkId));
+
+  const updated = await db.select().from(networks).where(eq(networks.id, networkId)).get();
+  return c.json({
+    success: true,
+    network: updated,
+    message: 'Network configuration updated successfully.'
+  });
+});
+
 // Topology Aggregation Endpoint for HUD:
-// Returns nodes (○ terminals, ⬡ gateways, ◇ subnets) and edges with link metrics.
 networksRouter.get('/:id/topology', async (c) => {
   const networkId = c.req.param('id');
   const db = c.get('db' as any);
@@ -78,6 +102,8 @@ networksRouter.get('/:id/topology', async (c) => {
     shape: 'DIAMOND',
     cidr4: net.ipv4Cidr,
     cidr6: net.ipv6Cidr,
+    virtualIpv4: net.ipv4Cidr,
+    virtualIpv6: net.ipv6Cidr,
     status: 'ACTIVE'
   });
 
@@ -96,6 +122,7 @@ networksRouter.get('/:id/topology', async (c) => {
       shape: shape,
       persona: dev.persona,
       userIntent: dev.userIntent,
+      publicKeyX25519: dev.publicKeyX25519,
       virtualIpv4: link.virtualIpv4,
       virtualIpv6: link.virtualIpv6,
       os: dev.os,
@@ -110,7 +137,6 @@ networksRouter.get('/:id/topology', async (c) => {
       lastSeenSecondsAgo: Math.round((Date.now() - dev.lastHeartbeat) / 1000)
     });
 
-    // Link edge between device and subnet
     edges.push({
       id: `edge_${dev.id}_subnet`,
       source: dev.id,
@@ -153,17 +179,19 @@ networksRouter.post('/:id/acl', async (c) => {
   const ruleId = `acl_${cryptoRandomString(12)}`;
   const now = Date.now();
 
+  const ruleName = body.name || `ACL-Rule-${ruleId.slice(4, 10)}`;
+
   await db.insert(aclRules).values({
     id: ruleId,
     networkId,
     priority: body.priority ?? 100,
-    name: body.name,
+    name: ruleName,
     action: body.action ?? 'ALLOW',
     sourceTags: JSON.stringify(body.sourceTags || []),
     destTags: JSON.stringify(body.destTags || []),
     protocol: body.protocol || 'ANY',
     destPorts: JSON.stringify(body.destPorts || []),
-    description: body.description,
+    description: body.description || '',
     enabled: true,
     createdAt: now
   });
@@ -171,6 +199,21 @@ networksRouter.post('/:id/acl', async (c) => {
   return c.json({
     id: ruleId,
     networkId,
+    name: ruleName,
+    priority: body.priority ?? 100,
+    action: body.action ?? 'ALLOW',
+    sourceTags: body.sourceTags || [],
+    destTags: body.destTags || [],
+    protocol: body.protocol || 'ANY',
+    destPorts: body.destPorts || [],
     message: 'ACL rule created successfully.'
   }, 201);
+});
+
+// Delete ACL Rule
+networksRouter.delete('/:id/acl/:ruleId', async (c) => {
+  const ruleId = c.req.param('ruleId');
+  const db = c.get('db' as any);
+  await db.delete(aclRules).where(eq(aclRules.id, ruleId));
+  return c.json({ success: true, ruleId, message: 'ACL rule deleted' });
 });

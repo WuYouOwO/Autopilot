@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   X, 
   ShieldCheck, 
@@ -9,7 +9,11 @@ import {
   Power, 
   Key, 
   Globe, 
-  Cpu 
+  Cpu,
+  Copy,
+  Check,
+  SlidersHorizontal,
+  Trash2
 } from 'lucide-react';
 
 interface DiagnosticModalProps {
@@ -17,14 +21,21 @@ interface DiagnosticModalProps {
   onClose: () => void;
   onToggleIntent: (nodeId: string, currentIntent: string) => void;
   onRevoke: (nodeId: string) => void;
+  onSwitchPersona?: (nodeId: string, currentPersona: string) => void;
+  onDeleteNode?: (nodeId: string) => void;
 }
 
 export const DiagnosticInspectorModal: React.FC<DiagnosticModalProps> = ({
   node,
   onClose,
   onToggleIntent,
-  onRevoke
+  onRevoke,
+  onSwitchPersona,
+  onDeleteNode
 }) => {
+  const [copiedKey, setCopiedKey] = useState(false);
+  const [copiedIp, setCopiedIp] = useState(false);
+
   if (!node) return null;
 
   const isServer = node.persona === 'SERVER_HEADLESS';
@@ -32,8 +43,19 @@ export const DiagnosticInspectorModal: React.FC<DiagnosticModalProps> = ({
   const isPaused = node.userIntent === 'USER_PAUSED';
   const isRevoked = node.userIntent === 'ADMIN_DISABLED';
 
+  const copyToClipboard = (text: string, type: 'key' | 'ip') => {
+    navigator.clipboard?.writeText(text);
+    if (type === 'key') {
+      setCopiedKey(true);
+      setTimeout(() => setCopiedKey(false), 2000);
+    } else {
+      setCopiedIp(true);
+      setTimeout(() => setCopiedIp(false), 2000);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/35 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-200">
       <div className="relative w-full max-w-2xl bg-white rounded-2xl p-6 shadow-2xl border border-slate-200 text-slate-800">
         
         {/* Header */}
@@ -59,7 +81,7 @@ export const DiagnosticInspectorModal: React.FC<DiagnosticModalProps> = ({
                   {node.userIntent || 'ACTIVE'}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5 font-mono">ID: {node.id}</p>
+              <p className="text-xs text-slate-500 mt-0.5 font-mono">节点唯一 ID: {node.id}</p>
             </div>
           </div>
           <button 
@@ -71,25 +93,44 @@ export const DiagnosticInspectorModal: React.FC<DiagnosticModalProps> = ({
         </div>
 
         {/* Persona & Guardrail Notice */}
-        <div className="my-4 p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+        <div className="my-4 p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-xs">
             <span className="font-semibold text-slate-600">设备画像 (Persona):</span>
             <span className="font-mono text-sky-700 bg-sky-50 px-2 py-0.5 rounded border border-sky-200 font-semibold">
               {node.persona || 'WORKSTATION_INTERACTIVE'}
             </span>
+            {onSwitchPersona && (
+              <button
+                onClick={() => onSwitchPersona(node.id, node.persona || 'WORKSTATION_INTERACTIVE')}
+                className="flex items-center gap-1 text-[11px] text-sky-600 hover:text-sky-800 bg-white px-2 py-0.5 rounded border border-slate-200 font-mono shadow-2xs hover:bg-sky-50 transition"
+                title="切换画像"
+              >
+                <SlidersHorizontal className="w-3 h-3" />
+                切换为{isServer ? '工作站 (人权第一)' : '无头服务器 (3.5s自愈)'}
+              </button>
+            )}
           </div>
-          <span className="text-xs text-slate-500">
-            {isServer ? '声明式管控 (3.5s 心跳自愈)' : '人权第一 (本地秒断秒连，禁止强拉)'}
+          <span className="text-xs text-slate-500 font-mono">
+            {isServer ? '3.5s 集中自愈' : '人权最高，绝不强拉'}
           </span>
         </div>
 
-        {/* Dual-Stack Network IPs */}
+        {/* Dual-Stack Network IPs with Copy buttons */}
         <div className="grid grid-cols-2 gap-4 mb-4">
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-            <span className="text-xs text-slate-500 font-mono block mb-1">虚拟 IPv4 地址</span>
-            <span className="text-sm font-mono text-sky-700 font-bold">
-              {node.virtualIpv4 || '10.144.1.x'}
-            </span>
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+            <div>
+              <span className="text-xs text-slate-500 font-mono block mb-1">虚拟 IPv4 地址</span>
+              <span className="text-sm font-mono text-sky-700 font-bold">
+                {node.virtualIpv4 || '10.144.1.x'}
+              </span>
+            </div>
+            <button
+              onClick={() => copyToClipboard(node.virtualIpv4 || '10.144.1.x', 'ip')}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-white transition"
+              title="复制 IPv4"
+            >
+              {copiedIp ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+            </button>
           </div>
           <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
             <span className="text-xs text-slate-500 font-mono block mb-1">虚拟 IPv6 地址 (双栈首发)</span>
@@ -106,7 +147,7 @@ export const DiagnosticInspectorModal: React.FC<DiagnosticModalProps> = ({
             <div>
               <div className="text-[11px] text-slate-500">延迟 / 链路</div>
               <div className="text-sm font-mono font-bold text-slate-800">
-                {isActive ? '12 ms (Direct P2P)' : '已断开'}
+                {isActive ? '12 ms (Direct P2P)' : '预期休眠'}
               </div>
             </div>
           </div>
@@ -130,25 +171,34 @@ export const DiagnosticInspectorModal: React.FC<DiagnosticModalProps> = ({
           </div>
         </div>
 
-        {/* X25519 Key */}
-        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 mb-6 flex items-center gap-2 font-mono text-xs">
-          <Key className="w-4 h-4 text-amber-500 shrink-0" />
-          <span className="text-slate-500 shrink-0">X25519 公钥:</span>
-          <span className="truncate text-slate-700">
-            {node.publicKeyX25519 || '7d9834b6b66b7c4a179e8cbb6c79a4c56891000a982348b610c4d81234567890'}
-          </span>
+        {/* X25519 Key with Copy */}
+        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 mb-6 flex items-center justify-between font-mono text-xs">
+          <div className="flex items-center gap-2 truncate">
+            <Key className="w-4 h-4 text-amber-500 shrink-0" />
+            <span className="text-slate-500 shrink-0">X25519:</span>
+            <span className="truncate text-slate-700 font-semibold">
+              {node.publicKeyX25519 || '7d9834b6b66b7c4a179e8cbb6c79a4c56891000a982348b610c4d81234567890'}
+            </span>
+          </div>
+          <button
+            onClick={() => copyToClipboard(node.publicKeyX25519 || '7d9834b6b66b7c4a179e8cbb6c79a4c56891000a982348b610c4d81234567890', 'key')}
+            className="p-1 rounded text-slate-400 hover:text-sky-600 ml-2 shrink-0"
+            title="复制公钥"
+          >
+            {copiedKey ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+          </button>
         </div>
 
-        {/* Action Controls */}
+        {/* Action Controls - ALL BUTTONS ACTIVE! */}
         <div className="flex items-center justify-between pt-4 border-t border-slate-200">
           <div className="flex items-center gap-2">
             <button
               onClick={() => onToggleIntent(node.id, node.userIntent || 'ACTIVE')}
               disabled={isRevoked}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-xs transition ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-xs transition active:scale-95 ${
                 isActive 
-                  ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 shadow-xs' 
-                  : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 shadow-xs'
+                  ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 shadow-2xs font-semibold' 
+                  : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 shadow-2xs font-semibold'
               } disabled:opacity-50`}
             >
               <Power className="w-4 h-4" />
@@ -156,14 +206,25 @@ export const DiagnosticInspectorModal: React.FC<DiagnosticModalProps> = ({
             </button>
           </div>
 
-          <button
-            onClick={() => onRevoke(node.id)}
-            disabled={isRevoked}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition disabled:opacity-50"
-          >
-            <ShieldAlert className="w-4 h-4" />
-            一键毫秒踢人 (Revoke)
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onRevoke(node.id)}
+              disabled={isRevoked}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition disabled:opacity-50 active:scale-95 shadow-2xs"
+            >
+              <ShieldAlert className="w-4 h-4" />
+              一键毫秒踢人
+            </button>
+            {onDeleteNode && (
+              <button
+                onClick={() => onDeleteNode(node.id)}
+                className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition border border-transparent hover:border-rose-200"
+                title="删除/注销此节点"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
 
       </div>
