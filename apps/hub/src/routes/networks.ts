@@ -179,19 +179,17 @@ networksRouter.post('/:id/acl', async (c) => {
   const ruleId = `acl_${cryptoRandomString(12)}`;
   const now = Date.now();
 
-  const ruleName = body.name || `ACL-Rule-${ruleId.slice(4, 10)}`;
-
   await db.insert(aclRules).values({
     id: ruleId,
     networkId,
     priority: body.priority ?? 100,
-    name: ruleName,
+    name: body.name,
     action: body.action ?? 'ALLOW',
     sourceTags: JSON.stringify(body.sourceTags || []),
     destTags: JSON.stringify(body.destTags || []),
     protocol: body.protocol || 'ANY',
     destPorts: JSON.stringify(body.destPorts || []),
-    description: body.description || '',
+    description: body.description,
     enabled: true,
     createdAt: now
   });
@@ -199,7 +197,7 @@ networksRouter.post('/:id/acl', async (c) => {
   return c.json({
     id: ruleId,
     networkId,
-    name: ruleName,
+    name: body.name,
     priority: body.priority ?? 100,
     action: body.action ?? 'ALLOW',
     sourceTags: body.sourceTags || [],
