@@ -1,0 +1,14 @@
+name = "autopilot-hub"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "production"
+JWT_SECRET = "change-in-production-autopilot-secret"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "autopilot_d1"
+database_id = "autopilot-prod-d1-id"
+migrations_dir = "drizzle"
