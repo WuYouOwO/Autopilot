@@ -1,0 +1,16 @@
+instance_name = "autopilot-devlab-node"
+hostname = "autopilot-devlab-node"
+ipv4 = "10.144.0.2/16"
+dhcp = false
+listeners = [
+    "tcp://0.0.0.0:21010",
+    "udp://0.0.0.0:21010",
+]
+rpc_portal = "127.0.0.1:15889"
+
+[network_identity]
+network_name = "net_corp_zero_trust"
+network_secret = "autopilot-sec-9921"
+
+[flags]
+dev_name = "tun1"

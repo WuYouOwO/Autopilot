@@ -96,3 +96,44 @@ func (h *HubClient) SendHeartbeat(ctx context.Context, deviceID string, telemetr
 	}
 	return &hbResp, nil
 }
+
+type EnrollDeviceReq struct {
+	Hostname        string   `json:"hostname"`
+	Persona         string   `json:"persona"`
+	PublicKeyX25519 string   `json:"publicKeyX25519"`
+	NetworkID       string   `json:"networkId"`
+	OS              string   `json:"os"`
+	ClientVersion   string   `json:"clientVersion"`
+	Tags            []string `json:"tags"`
+}
+
+type EnrollDeviceResp struct {
+	DeviceID string `json:"deviceId"`
+}
+
+func (h *HubClient) EnrollDevice(ctx context.Context, req *EnrollDeviceReq) (string, error) {
+	url := fmt.Sprintf("%s/api/v1/devices", h.baseURL)
+	data, _ := json.Marshal(req)
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(data))
+	if err != nil {
+		return "", err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := h.httpClient.Do(httpReq)
+	if err != nil {
+		return "", fmt.Errorf("enroll request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return "", fmt.Errorf("enroll failed with HTTP %d", resp.StatusCode)
+	}
+
+	var res EnrollDeviceResp
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return "", err
+	}
+	return res.DeviceID, nil
+}

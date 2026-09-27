@@ -95,6 +95,14 @@ func (l *IntentLock) HandleInboundHeartbeat() error {
 	return nil
 }
 
+// SetRemoteState updates the state as commanded by Central Hub
+func (l *IntentLock) SetRemoteState(state IntentState) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.currentState = state
+	l.lastChanged = time.Now()
+}
+
 // AdminRevoke sets state to ADMIN_DISABLED
 func (l *IntentLock) AdminRevoke() {
 	l.mu.Lock()

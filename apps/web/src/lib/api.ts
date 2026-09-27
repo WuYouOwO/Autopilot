@@ -268,12 +268,12 @@ class AutopilotApi {
       const res = await fetch(`${this.baseURL}/api/v1/devices`);
       if (res.ok) {
         const data = await res.json();
-        return data.devices?.length > 0 ? data.devices : DEFAULT_DEVICES;
+        return Array.isArray(data.devices) ? data.devices : [];
       }
     } catch {
       // Fallback
     }
-    return DEFAULT_DEVICES;
+    return [];
   }
 
   async enrollDevice(deviceData: {
@@ -451,39 +451,10 @@ class AutopilotApi {
         shape: 'DIAMOND',
         virtualIpv4: net.ipv4Cidr,
         virtualIpv6: net.ipv6Cidr
-      },
-      ...DEFAULT_DEVICES.map(d => ({
-        id: d.id,
-        label: d.hostname,
-        type: d.tags.includes('gateway') ? 'GATEWAY' : 'TERMINAL',
-        shape: d.tags.includes('gateway') ? 'HEXAGON' : 'CIRCLE',
-        persona: d.persona,
-        userIntent: d.userIntent,
-        publicKeyX25519: d.publicKeyX25519,
-        virtualIpv4: d.networks[0]?.virtualIpv4,
-        virtualIpv6: d.networks[0]?.virtualIpv6,
-        os: d.os,
-        telemetry: d.telemetry,
-        geo: {
-          latitude: d.latitude,
-          longitude: d.longitude,
-          city: d.city,
-          country: d.country,
-          cloudProvider: d.cloudProvider
-        },
-        lastSeenSecondsAgo: Math.round((Date.now() - d.lastHeartbeat) / 1000)
-      }))
+      }
     ];
 
-    const edges = DEFAULT_DEVICES.map(d => ({
-      id: `edge_${d.id}`,
-      source: d.id,
-      target: `subnet_${net.id}`,
-      active: d.userIntent === 'ACTIVE',
-      latencyMs: d.userIntent === 'ACTIVE' ? Math.floor(Math.random() * 25) + 8 : 0
-    }));
-
-    return { network: net, nodes, edges, connectors: [] };
+    return { network: net, nodes, edges: [], connectors: [] };
   }
 }
 
