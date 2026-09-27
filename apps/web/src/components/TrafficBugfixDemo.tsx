@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bug, CheckCircle, RotateCcw, AlertTriangle, Zap, ShieldCheck } from 'lucide-react';
+import { Bug, CheckCircle, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { TrafficRateTracker, formatBytesPerSec } from '@autopilot/protocol';
 
 export const TrafficBugfixDemo: React.FC = () => {
@@ -69,8 +69,7 @@ export const TrafficBugfixDemo: React.FC = () => {
     const now = simulatedTime + 1000;
 
     // Buggy algorithm: unsigned underflow or negative treated as unsigned 32-bit:
-    // (0 - 12500000) -> 4282467296 -> 4.2 GB/s spike or NaN
-    setBuggyRateStr('4.2 GB/s (Overflow Spike!)');
+    setBuggyRateStr('4.2 GB/s (无符号溢出脉冲!)');
     setBuggySpikeDetected(true);
     setBuggyLastRx(0);
 
@@ -84,17 +83,17 @@ export const TrafficBugfixDemo: React.FC = () => {
   };
 
   return (
-    <div className="glass-panel rounded-2xl p-6 border border-cyan-500/20 space-y-6">
-      <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+    <div className="glass-panel rounded-2xl p-6 border border-slate-200/90 shadow-sm bg-white/90 space-y-6">
+      <div className="flex items-center justify-between pb-4 border-b border-slate-200">
         <div>
           <div className="flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-cyan-400" />
-            <h3 className="text-base font-bold font-mono text-slate-100">
+            <ShieldCheck className="w-5 h-5 text-sky-600" />
+            <h3 className="text-base font-bold font-mono text-slate-900">
               12.4 MB/s 虚假流量峰值根治算法验证实验室 (Algorithm Verification Lab)
             </h3>
           </div>
-          <p className="text-xs text-slate-400 font-mono mt-0.5">
-            Real-time comparative verification: Official Buggy Algorithm vs Autopilot Monotonic Clamped Tracker
+          <p className="text-xs text-slate-500 font-mono mt-0.5">
+            实时对比验算：官方 Naive Diff 算法缺陷 vs Autopilot 单调时间差值平滑算法
           </p>
         </div>
 
@@ -102,19 +101,19 @@ export const TrafficBugfixDemo: React.FC = () => {
         <div className="flex items-center gap-2">
           <button
             onClick={simulateInitialJoin}
-            className="px-3 py-1.5 rounded-xl text-xs font-mono font-medium bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 border border-cyan-500/40 transition"
+            className="px-3 py-1.5 rounded-xl text-xs font-mono font-medium bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200 transition shadow-xs"
           >
             1. 模拟初次入网 (Initial Join)
           </button>
           <button
             onClick={simulateNormalTick}
-            className="px-3 py-1.5 rounded-xl text-xs font-mono font-medium bg-slate-800 text-slate-200 hover:bg-slate-700 transition"
+            className="px-3 py-1.5 rounded-xl text-xs font-mono font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition shadow-xs"
           >
             2. 模拟正常流量 (+100KB)
           </button>
           <button
             onClick={simulateReconnectDrop}
-            className="px-3 py-1.5 rounded-xl text-xs font-mono font-medium bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 border border-rose-500/40 transition"
+            className="px-3 py-1.5 rounded-xl text-xs font-mono font-medium bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition shadow-xs"
           >
             3. 模拟断线重连 (Counter Drop)
           </button>
@@ -124,61 +123,61 @@ export const TrafficBugfixDemo: React.FC = () => {
       {/* Side-by-Side Comparison */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Left: Official Buggy Algorithm */}
-        <div className="p-5 rounded-2xl bg-slate-900/80 border border-rose-500/30 relative overflow-hidden">
+        <div className="p-5 rounded-2xl bg-rose-50/40 border border-rose-200 relative overflow-hidden">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-mono font-bold text-rose-400 flex items-center gap-1.5">
+            <span className="text-xs font-mono font-bold text-rose-700 flex items-center gap-1.5">
               <Bug className="w-4 h-4" />
               EasyTier 官方前端算法 (Naive Diff)
             </span>
-            <span className="text-[10px] px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800 font-mono">
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200 font-mono font-bold">
               BUGGY
             </span>
           </div>
 
-          <div className="text-3xl font-mono font-bold text-rose-400 my-4">
+          <div className="text-3xl font-mono font-bold text-rose-600 my-4">
             {buggyRateStr}
           </div>
 
-          <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-xs font-mono space-y-1 text-slate-400">
-            <div>算法: <span className="text-rose-300">rate = (curr - prev) / fixed_time</span></div>
-            <div>缺陷 1: 初次入网以 0 为 baseline，直接把累积 12.4 MB 当作 1 秒流量！</div>
-            <div>缺陷 2: 重连计数器归零时产生无符号数溢出或负数脉冲。</div>
+          <div className="p-3.5 rounded-xl bg-white border border-rose-100 text-xs font-mono space-y-1.5 text-slate-600">
+            <div>算法逻辑: <span className="text-rose-700 font-semibold">rate = (curr - prev) / fixed_time</span></div>
+            <div>缺陷 1: 初次入网以 0 为 baseline，把累积已有的 12.4 MB 直接当作 1 秒瞬间流量！</div>
+            <div>缺陷 2: 重连计数器归零时产生无符号整数溢出或负数脉冲。</div>
           </div>
 
           {buggySpikeDetected && (
-            <div className="mt-3 flex items-center gap-1.5 text-xs font-mono text-rose-400 animate-pulse">
+            <div className="mt-3 flex items-center gap-1.5 text-xs font-mono text-rose-600 animate-pulse font-semibold">
               <AlertTriangle className="w-4 h-4" />
-              触发虚假 12.4 MB/s 或 4.2 GB/s 流量突刺！
+              已复现虚假 12.4 MB/s 或 4.2 GB/s 流量突刺！
             </div>
           )}
         </div>
 
         {/* Right: Autopilot Monotonic Clamped Tracker */}
-        <div className="p-5 rounded-2xl bg-slate-900/80 border border-emerald-500/30 relative overflow-hidden">
+        <div className="p-5 rounded-2xl bg-emerald-50/40 border border-emerald-200 relative overflow-hidden">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-mono font-bold text-emerald-400 flex items-center gap-1.5">
+            <span className="text-xs font-mono font-bold text-emerald-700 flex items-center gap-1.5">
               <CheckCircle className="w-4 h-4" />
               Autopilot 单调防溢出平滑算法
             </span>
-            <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 font-mono">
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 font-mono font-bold">
               SOLVED
             </span>
           </div>
 
-          <div className="text-3xl font-mono font-bold text-emerald-400 my-4">
+          <div className="text-3xl font-mono font-bold text-emerald-600 my-4">
             {fixedRateStr}
           </div>
 
-          <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-xs font-mono space-y-1 text-slate-400">
-            <div>算法: <span className="text-emerald-300">Monotonic Δt + Initial Baseline Clamping + EMA</span></div>
-            <div>特性 1: 首个采样建立基准参考点，初次速率严格保证 0 B/s。</div>
+          <div className="p-3.5 rounded-xl bg-white border border-emerald-100 text-xs font-mono space-y-1.5 text-slate-600">
+            <div>算法逻辑: <span className="text-emerald-700 font-semibold">Monotonic Δt + Initial Baseline Clamping + EMA</span></div>
+            <div>特性 1: 首个采样仅注册参考基准点，初次速率严格保证 0 B/s。</div>
             <div>特性 2: 负向差值自动识别断线重置，配合指数平滑阻断突刺。</div>
           </div>
 
           {fixedSuppressed && (
-            <div className="mt-3 flex items-center gap-1.5 text-xs font-mono text-emerald-400">
+            <div className="mt-3 flex items-center gap-1.5 text-xs font-mono text-emerald-700 font-semibold">
               <ShieldCheck className="w-4 h-4" />
-              单调性锁已成功拦截重连归零抖动，数据维持平滑。
+              单调性锁已成功拦截重连归零抖动，数据维持稳定平滑。
             </div>
           )}
         </div>

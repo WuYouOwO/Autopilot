@@ -6,10 +6,7 @@ import {
   Smartphone, 
   Zap, 
   ShieldCheck, 
-  Globe, 
-  Terminal, 
-  Activity, 
-  Cpu 
+  Globe 
 } from 'lucide-react';
 import { api, DeviceData, TopologyData } from './lib/api';
 import { TopologyHUD } from './components/TopologyHUD';
@@ -22,17 +19,16 @@ export function App() {
   const [activeTab, setActiveTab] = useState<'topology' | 'network' | 'hardware' | 'wap' | 'bugfix'>('topology');
   const [devices, setDevices] = useState<DeviceData[]>([]);
   const [topology, setTopology] = useState<TopologyData | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  // Load data
+  // Load data from live Hub
   const loadData = async () => {
     try {
       const devs = await api.getDevices();
       setDevices(devs);
       const topo = await api.getTopology('net_corp_zero_trust');
       setTopology(topo);
-    } finally {
-      setLoading(false);
+    } catch {
+      // Fallback handled inside api.ts
     }
   };
 
@@ -42,9 +38,8 @@ export function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Handle instant pause/resume toggle
+  // Handle instant pause/resume toggle (<10ms optimistic UI update)
   const handleToggleIntent = async (deviceId: string, currentIntent: string) => {
-    // 1. Optimistic Local Update (<10ms UI instant response)
     const nextIntent = currentIntent === 'ACTIVE' ? 'USER_PAUSED' : 'ACTIVE';
     setDevices(prev => prev.map(d => d.id === deviceId ? { ...d, userIntent: nextIntent } : d));
     if (topology) {
@@ -54,7 +49,6 @@ export function App() {
       });
     }
 
-    // 2. Out-of-band async sync to Hub (30~50ms)
     if (currentIntent === 'ACTIVE') {
       await api.pauseDevice(deviceId, 'net_corp_zero_trust');
     } else {
@@ -79,94 +73,94 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col font-sans text-slate-100">
-      {/* Top Tactical Navigation Header */}
-      <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-cyber-950/80 backdrop-blur-xl">
+    <div className="min-h-screen flex flex-col font-sans text-slate-800 bg-slate-50/60 selection:bg-sky-100 selection:text-sky-900">
+      {/* Top Tactical Navigation Header (Light Frosted Glass) */}
+      <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/85 backdrop-blur-xl shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           
           {/* Logo & Slogan */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-              <Compass className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 via-blue-600 to-indigo-600 flex items-center justify-center shadow-md shadow-sky-500/20 text-white">
+              <Compass className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-lg font-bold font-mono tracking-wider bg-gradient-to-r from-cyan-400 via-sky-300 to-blue-400 bg-clip-text text-transparent">
+                <span className="text-lg font-bold font-mono tracking-wider bg-gradient-to-r from-sky-600 via-blue-700 to-indigo-700 bg-clip-text text-transparent">
                   AUTOPILOT
                 </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800 font-semibold">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200 font-bold">
                   v1.0 ZERO-TRUST
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 font-mono tracking-tight">
-                From Cockpit to Autopilot • EasyTier Control Plane
+              <p className="text-[11px] text-slate-500 font-mono tracking-tight">
+                From Cockpit to Autopilot • 现代化 EasyTier 零信任控制平面
               </p>
             </div>
           </div>
 
-          {/* Navigation Tabs */}
-          <nav className="hidden md:flex items-center gap-1.5 p-1 bg-slate-900/80 rounded-2xl border border-slate-800 font-mono text-xs">
+          {/* Navigation Tabs (Light Pill Style) */}
+          <nav className="hidden md:flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-2xl border border-slate-200 font-mono text-xs">
             <button
               onClick={() => setActiveTab('topology')}
               className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-medium transition ${
                 activeTab === 'topology'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-white text-sky-700 border border-slate-200 shadow-xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
               }`}
             >
-              <Compass className="w-4 h-4" />
+              <Compass className="w-4 h-4 text-sky-600" />
               战情 HUD 拓扑
             </button>
             <button
               onClick={() => setActiveTab('network')}
               className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-medium transition ${
                 activeTab === 'network'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-white text-sky-700 border border-slate-200 shadow-xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
               }`}
             >
-              <Layers className="w-4 h-4" />
+              <Layers className="w-4 h-4 text-sky-600" />
               组织网络轴
             </button>
             <button
               onClick={() => setActiveTab('hardware')}
               className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-medium transition ${
                 activeTab === 'hardware'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-white text-sky-700 border border-slate-200 shadow-xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
               }`}
             >
-              <Server className="w-4 h-4" />
+              <Server className="w-4 h-4 text-sky-600" />
               硬件机器轴
             </button>
             <button
               onClick={() => setActiveTab('wap')}
               className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-medium transition ${
                 activeTab === 'wap'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-white text-sky-700 border border-slate-200 shadow-xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
               }`}
             >
-              <Smartphone className="w-4 h-4" />
+              <Smartphone className="w-4 h-4 text-sky-600" />
               移动端 WAP
             </button>
             <button
               onClick={() => setActiveTab('bugfix')}
               className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-medium transition ${
                 activeTab === 'bugfix'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-white text-amber-700 border border-slate-200 shadow-xs font-semibold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
               }`}
             >
-              <Zap className="w-4 h-4 text-yellow-400" />
+              <Zap className="w-4 h-4 text-amber-500" />
               12.4 MB/s 修复验算
             </button>
           </nav>
 
           {/* Edge Health Status Pill */}
           <div className="flex items-center gap-2 text-xs font-mono">
-            <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-slate-300">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 font-medium">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span>D1 Edge SSOT: Active</span>
             </div>
           </div>
@@ -181,7 +175,7 @@ export function App() {
           <select
             value={activeTab}
             onChange={(e) => setActiveTab(e.target.value as any)}
-            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 font-mono text-sm text-cyan-300 focus:outline-none"
+            className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2 font-mono text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/30 shadow-xs"
           >
             <option value="topology">战情 HUD 拓扑</option>
             <option value="network">组织网络轴</option>
@@ -202,25 +196,33 @@ export function App() {
 
             {/* Quick Status Bar */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 rounded-xl glass-panel border border-cyan-500/10 flex items-center gap-3">
-                <ShieldCheck className="w-6 h-6 text-emerald-400 shrink-0" />
+              <div className="p-4 rounded-2xl glass-panel flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+                  <ShieldCheck className="w-5 h-5 shrink-0" />
+                </div>
                 <div>
-                  <div className="text-xs font-mono text-slate-400">Zero-Trust Guardrails</div>
-                  <div className="text-sm font-semibold text-slate-200">底层宿主网卡绝对受保 • 纯内存 RPC 释放</div>
+                  <div className="text-xs font-mono text-slate-500">Zero-Trust Guardrails</div>
+                  <div className="text-sm font-semibold text-slate-800">宿主底层网卡绝对受保 • 纯内存 RPC 释放</div>
                 </div>
               </div>
-              <div className="p-4 rounded-xl glass-panel border border-cyan-500/10 flex items-center gap-3">
-                <Zap className="w-6 h-6 text-yellow-400 shrink-0" />
+
+              <div className="p-4 rounded-2xl glass-panel flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-amber-50 text-amber-600 border border-amber-100">
+                  <Zap className="w-5 h-5 shrink-0" />
+                </div>
                 <div>
-                  <div className="text-xs font-mono text-slate-400">Local Latency & Sync</div>
-                  <div className="text-sm font-semibold text-slate-200">&lt; 10ms 乐观响应 • 30~50ms 带外写入 D1</div>
+                  <div className="text-xs font-mono text-slate-500">Local Latency & Sync</div>
+                  <div className="text-sm font-semibold text-slate-800">&lt; 10ms 乐观响应 • 30~50ms 带外写入 D1</div>
                 </div>
               </div>
-              <div className="p-4 rounded-xl glass-panel border border-cyan-500/10 flex items-center gap-3">
-                <Globe className="w-6 h-6 text-cyan-400 shrink-0" />
+
+              <div className="p-4 rounded-2xl glass-panel flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-sky-50 text-sky-600 border border-sky-100">
+                  <Globe className="w-5 h-5 shrink-0" />
+                </div>
                 <div>
-                  <div className="text-xs font-mono text-slate-400">Dual Persona Governance</div>
-                  <div className="text-sm font-semibold text-slate-200">机房无头自愈 (3.5s) • 终端秒断秒连人权第一</div>
+                  <div className="text-xs font-mono text-slate-500">Dual Persona Governance</div>
+                  <div className="text-sm font-semibold text-slate-800">机房无头自愈 (3.5s) • 终端秒断秒连人权第一</div>
                 </div>
               </div>
             </div>
@@ -254,9 +256,9 @@ export function App() {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-800/80 py-4 mt-auto bg-cyber-950/60 font-mono text-xs text-slate-500 text-center">
-        Autopilot Control Plane • Isomorphic Cloudflare Edge & Self-Hosted • EasyTier Native IPC/RPC Engine
+      {/* Clean Light Footer */}
+      <footer className="border-t border-slate-200 py-4 mt-auto bg-white/70 backdrop-blur-md font-mono text-xs text-slate-500 text-center">
+        Autopilot 零信任现代化控制平面 • Cloudflare 边缘架构与本地同构 • EasyTier 原生 IPC/RPC 引擎
       </footer>
     </div>
   );
