@@ -7,7 +7,6 @@ import { devicesRouter } from './routes/devices.js';
 import { networksRouter } from './routes/networks.js';
 import { gatewayRouter } from './routes/gateway.js';
 import { connectorRouter } from './routes/connector.js';
-import { geoipRouter } from './routes/geoip.js';
 import { AppEnv } from './types.js';
 
 export const app = new Hono<AppEnv>();
@@ -45,6 +44,5 @@ app.route('/api/v1/devices', devicesRouter);
 app.route('/api/v1/networks', networksRouter);
 app.route('/api/v1/gateway', gatewayRouter);
 app.route('/api/v1/connectors', connectorRouter);
-app.route('/api/v1/geoip', geoipRouter);
 
 export default app;

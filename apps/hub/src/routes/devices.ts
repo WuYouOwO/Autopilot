@@ -3,7 +3,6 @@ import { eq, and } from 'drizzle-orm';
 import { devices, deviceNetworks, networks, auditLogs } from '../db/schema.js';
 import { transitionIntentState, DevicePersona } from '@autopilot/protocol';
 import { cryptoRandomString, allocateIpv4, allocateIpv6 } from '../utils.js';
-import { resolveGeoIP } from '../services/geoip.js';
 import { AppEnv } from '../types.js';
 
 export const devicesRouter = new Hono<AppEnv>();
@@ -49,7 +48,6 @@ devicesRouter.post('/', async (c) => {
       country?: string;
       cloudProvider?: string;
     };
-    publicIp?: string;
     tags?: string[];
   }>();
 
@@ -61,15 +59,6 @@ devicesRouter.post('/', async (c) => {
   const now = Date.now();
   const persona: DevicePersona = body.persona || 'WORKSTATION_INTERACTIVE';
 
-  // Real IP Database lookup
-  const clientIp = 
-    c.req.header('cf-connecting-ip') ||
-    c.req.header('x-real-ip') ||
-    c.req.header('x-forwarded-for')?.split(',')[0].trim() ||
-    body.publicIp;
-
-  const resolvedGeo = resolveGeoIP(clientIp);
-
   await db.insert(devices).values({
     id: deviceId,
     hostname: body.hostname,
@@ -78,11 +67,11 @@ devicesRouter.post('/', async (c) => {
     publicKeyX25519: body.publicKeyX25519,
     os: body.os || 'linux',
     clientVersion: body.clientVersion || '1.0.0',
-    latitude: body.geo?.latitude ?? resolvedGeo.latitude,
-    longitude: body.geo?.longitude ?? resolvedGeo.longitude,
-    city: body.geo?.city || resolvedGeo.city,
-    country: body.geo?.country || resolvedGeo.country,
-    cloudProvider: body.geo?.cloudProvider || resolvedGeo.cloudProvider,
+    latitude: body.geo?.latitude ?? 37.7749,
+    longitude: body.geo?.longitude ?? -122.4194,
+    city: body.geo?.city || 'San Francisco',
+    country: body.geo?.country || 'US',
+    cloudProvider: body.geo?.cloudProvider || 'EDGE',
     tags: JSON.stringify(body.tags || []),
     telemetry: JSON.stringify({ rxBytesTotal: 0, txBytesTotal: 0 }),
     lastHeartbeat: now,
@@ -231,24 +220,6 @@ devicesRouter.post('/:id/heartbeat', async (c) => {
 
   if (body.telemetry) {
     updateData.telemetry = JSON.stringify(body.telemetry);
-    
-    // Check if telemetry or client request has a public IP
-    const detectedIp = 
-      body.telemetry.publicIp ||
-      c.req.header('cf-connecting-ip') ||
-      c.req.header('x-real-ip') ||
-      c.req.header('x-forwarded-for')?.split(',')[0].trim();
-
-    if (detectedIp) {
-      const geo = resolveGeoIP(detectedIp);
-      if (!geo.isPrivate) {
-        updateData.city = geo.city;
-        updateData.country = geo.country;
-        updateData.latitude = geo.latitude;
-        updateData.longitude = geo.longitude;
-        updateData.cloudProvider = geo.cloudProvider;
-      }
-    }
   }
 
   // If a gateway heartbeat tries to revive a paused device:
@@ -301,25 +272,5 @@ devicesRouter.patch('/:id/persona', async (c) => {
     deviceId,
     persona: body.persona,
     message: `Device persona updated to ${body.persona}`
-  });
-});
-
-// Delete Device (Unenroll / Remove)
-devicesRouter.delete('/:id', async (c) => {
-  const deviceId = c.req.param('id');
-  const db = c.get('db' as any);
-
-  const device = await db.select().from(devices).where(eq(devices.id, deviceId)).get();
-  if (!device) {
-    return c.json({ error: 'Device not found' }, 404);
-  }
-
-  await db.delete(deviceNetworks).where(eq(deviceNetworks.deviceId, deviceId));
-  await db.delete(devices).where(eq(devices.id, deviceId));
-
-  return c.json({
-    success: true,
-    deviceId,
-    message: `Device ${deviceId} successfully deleted.`
   });
 });
