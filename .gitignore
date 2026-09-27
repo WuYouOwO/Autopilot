@@ -24,8 +24,8 @@ apps/agent/bin/
 apps/agent/autopilot-agent
 
 # SQLite databases
-*.sqlite
-*.sqlite3
+*.sqlite*
+*.sqlite3*
 *.db
 *.db-journal
 
