@@ -1,0 +1,12 @@
+{
+  "remote.portsAttributes": {
+    "5173": {
+      "label": "EasyTier Next-Gen Console",
+      "onAutoForward": "openBrowser"
+    },
+    "11211": {
+      "label": "EasyTier Web Backend",
+      "onAutoForward": "silent"
+    }
+  }
+}

@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* 浅色模式 - 优雅轻柔淡色系 (Soft & Crisp Slate) */
+    --background: 210 40% 98%;          /* #f8fafc */
+    --foreground: 222 47% 11%;          /* #0f172a */
+    --card: 0 0% 100%;                  /* #ffffff */
+    --card-foreground: 222 47% 11%;     /* #0f172a */
+    --border: 214 32% 91%;              /* #e2e8f0 */
+    --input: 214 32% 91%;
+    --primary: 238 82% 59%;             /* #4f46e5 - Modern Indigo */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96%;           /* #f1f5f9 */
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;    /* #64748b */
+    --accent: 210 40% 94%;
+    --accent-foreground: 222 47% 11%;
+    --ring: 238 82% 59%;
+    --radius: 0.5rem;
+
+    color-scheme: light;
+  }
+
+  .dark {
+    /* 深色模式 - 纯正中性极客炭黑 (Deep Zinc) */
+    --background: 240 10% 4%;           /* #09090b */
+    --foreground: 0 0% 98%;             /* #fafafa */
+    --card: 240 10% 7.5%;               /* #141417 */
+    --card-foreground: 0 0% 98%;
+    --border: 240 4% 16%;               /* #27272a */
+    --input: 240 4% 16%;
+    --primary: 238 82% 64%;             /* #6366f1 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 4% 12%;            /* #1f1f23 */
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 4% 14%;
+    --muted-foreground: 240 5% 65%;     /* #a1a1aa */
+    --accent: 240 4% 16%;
+    --accent-foreground: 0 0% 98%;
+    --ring: 238 82% 64%;
+
+    color-scheme: dark;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground transition-colors duration-150;
+  }
+}
+
+/* 优雅精致的滚动条 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 9999px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(113, 113, 122, 0.3);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.6);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(113, 113, 122, 0.6);
+}
+
+/* 呼吸动画效果（用于节点状态灯） */
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.95); }
+}
+.animate-pulse-subtle {
+  animation: pulse-subtle 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
