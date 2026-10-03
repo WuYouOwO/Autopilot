@@ -4,44 +4,44 @@
 
 @layer base {
   :root {
-    /* 浅色模式 - 纯正 Cloudflare 风格淡色系 (Soft Cloudflare Dashboard Light) */
-    --background: 210 20% 98%;          /* #f8fafc - 极柔和护眼浅灰底 */
-    --foreground: 220 26% 14%;          /* #1a1e24 - 高对比暗灰字 */
+    /* 浅色模式 - 纯正 Cloudflare 风格淡色系 (Pale Tech Light: 蓝/绿/白基底) */
+    --background: 210 20% 98%;          /* #f8fafc - 清爽淡雅浅灰白底色 */
+    --foreground: 222 47% 11%;          /* #0f172a - 高清晰深灰文字 */
     --card: 0 0% 100%;                  /* #ffffff - 纯白卡片 */
-    --card-foreground: 220 26% 14%;     /* #1a1e24 */
-    --border: 220 13% 90%;              /* #e2e5ea - 细致边框 */
-    --input: 220 13% 90%;
-    --primary: 27 90% 54%;              /* #f38020 - Cloudflare 标志性橙色 */
+    --card-foreground: 222 47% 11%;     /* #0f172a */
+    --border: 214 32% 91%;              /* #e2e8f0 - 精致浅边框 */
+    --input: 214 32% 91%;
+    --primary: 217 91% 45%;              /* #0051c3 - 经典 Tech Blue 品牌蓝 */
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 20% 95%;           /* #eff2f6 */
-    --secondary-foreground: 220 26% 14%;
-    --muted: 210 20% 95%;
-    --muted-foreground: 220 10% 46%;    /* #69707d */
-    --accent: 27 100% 97%;              /* #fff5ed - 极淡橙色高亮底 */
-    --accent-foreground: 27 90% 45%;    /* #d96200 */
-    --ring: 27 90% 54%;
+    --secondary: 210 40% 96%;           /* #f1f5f9 - 柔和次级背景 */
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;    /* #64748b - 辅助文字灰 */
+    --accent: 214 100% 97%;              /* #eff6ff - 淡蓝高亮底色 */
+    --accent-foreground: 224 76% 48%;    /* #1d4ed8 - 深蓝高亮字 */
+    --ring: 217 91% 45%;
     --radius: 0.375rem;
 
     color-scheme: light;
   }
 
   .dark {
-    /* 深色模式 - 沉浸式 Cloudflare Dark Console */
-    --background: 220 18% 7%;           /* #101216 - Cloudflare 深炭底色 */
-    --foreground: 220 14% 96%;          /* #f3f4f6 */
-    --card: 220 16% 12%;                /* #191c22 - 深色卡片 */
-    --card-foreground: 220 14% 96%;
-    --border: 220 13% 18%;              /* #262a33 - 深色细边框 */
-    --input: 220 13% 18%;
-    --primary: 27 90% 54%;              /* #f38020 - Cloudflare 橙色 */
+    /* 深色模式 - 沉浸式 Slate Navy Dark */
+    --background: 222 47% 9%;           /* #0c1322 - 深海蓝炭黑 */
+    --foreground: 210 40% 98%;          /* #f8fafc */
+    --card: 217 33% 15%;                /* #172136 - 暗蓝灰卡片 */
+    --card-foreground: 210 40% 98%;
+    --border: 215 25% 24%;              /* #23324d - 深色边框 */
+    --input: 215 25% 24%;
+    --primary: 217 91% 60%;              /* #3b82f6 - 亮蓝 */
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 14% 16%;           /* #21252d */
-    --secondary-foreground: 220 14% 96%;
-    --muted: 220 14% 16%;
-    --muted-foreground: 220 9% 62%;     /* #979ea8 */
-    --accent: 27 90% 16%;               /* #422006 - 深暗橙色高亮底 */
-    --accent-foreground: 27 95% 65%;    /* #fca049 */
-    --ring: 27 90% 54%;
+    --secondary: 217 33% 18%;           /* #1e293b */
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 33% 18%;
+    --muted-foreground: 215 20% 65%;     /* #94a3b8 */
+    --accent: 217 91% 18%;              /* #172554 - 沉浸深蓝底 */
+    --accent-foreground: 213 94% 68%;   /* #60a5fa */
+    --ring: 217 91% 60%;
 
     color-scheme: dark;
   }
@@ -66,17 +66,17 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(156, 163, 175, 0.35);
+  background: rgba(148, 163, 184, 0.35);
   border-radius: 9999px;
 }
 .dark ::-webkit-scrollbar-thumb {
-  background: rgba(107, 114, 128, 0.4);
+  background: rgba(100, 116, 139, 0.4);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(156, 163, 175, 0.65);
+  background: rgba(148, 163, 184, 0.65);
 }
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: rgba(107, 114, 128, 0.7);
+  background: rgba(100, 116, 139, 0.7);
 }
 
 /* 呼吸动画效果（用于节点状态灯） */

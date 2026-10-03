@@ -3,14 +3,14 @@
     <!-- Header -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>
-        <div class="flex items-center gap-2 text-xs font-medium text-orange-600 dark:text-orange-400 mb-1">
+        <div class="flex items-center gap-2 text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">
           <Server class="w-3.5 h-3.5" />
           <span>EDGE COMPUTE NODES</span>
         </div>
-        <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+        <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
           边缘计算节点与物理设备 (Devices)
         </h1>
-        <p class="text-xs text-slate-500 dark:text-zinc-400 mt-1">
+        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
           查看已向 EasyTier 边缘网络控制器注册的主机资产、实时心跳状态与挂载的 Mesh 实例。
         </p>
       </div>
@@ -29,21 +29,21 @@
 
     <!-- CF Quick Telemetry Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-      <Card class="p-4 border-slate-200 dark:border-[#262a33]">
-        <div class="flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400 font-medium">
+      <Card class="p-4 border-slate-200/90 dark:border-slate-800">
+        <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
           <span>注册主机总数</span>
           <Laptop class="w-4 h-4 text-slate-400" />
         </div>
-        <div class="text-2xl font-bold text-slate-900 dark:text-zinc-100 mt-2">
+        <div class="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-2">
           {{ machines.length }}
         </div>
-        <div class="text-[11px] text-slate-400 dark:text-zinc-500 mt-1">
+        <div class="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
           全平台纳管主机硬件
         </div>
       </Card>
 
-      <Card class="p-4 border-slate-200 dark:border-[#262a33]">
-        <div class="flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400 font-medium">
+      <Card class="p-4 border-slate-200/90 dark:border-slate-800">
+        <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
           <span>在线活跃节点</span>
           <Activity class="w-4 h-4 text-emerald-500" />
         </div>
@@ -55,32 +55,32 @@
         </div>
       </Card>
 
-      <Card class="p-4 border-slate-200 dark:border-[#262a33]">
-        <div class="flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400 font-medium">
+      <Card class="p-4 border-slate-200/90 dark:border-slate-800">
+        <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
           <span>运行 Mesh 实例</span>
-          <Globe class="w-4 h-4 text-[#f38020]" />
+          <Globe class="w-4 h-4 text-blue-500" />
         </div>
-        <div class="text-2xl font-bold text-orange-600 dark:text-orange-400 mt-2">
+        <div class="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-2">
           {{ totalRunningInstances }}
         </div>
-        <div class="text-[11px] text-slate-400 dark:text-zinc-500 mt-1">
+        <div class="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
           活跃虚拟隧道网卡
         </div>
       </Card>
 
-      <Card class="p-4 border-slate-200 dark:border-[#262a33]">
-        <div class="flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400 font-medium">
+      <Card class="p-4 border-slate-200/90 dark:border-slate-800">
+        <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
           <span>跨平台支持</span>
           <Cpu class="w-4 h-4 text-blue-500" />
         </div>
-        <div class="text-xs font-bold text-slate-800 dark:text-zinc-200 mt-3 flex items-center gap-2">
+        <div class="text-xs font-bold text-slate-800 dark:text-slate-200 mt-3 flex items-center gap-2">
           <span>Linux: {{ osCounts.linux }}</span>
           <span>·</span>
           <span>Win: {{ osCounts.windows }}</span>
           <span>·</span>
           <span>Mac: {{ osCounts.darwin }}</span>
         </div>
-        <div class="text-[11px] text-slate-400 dark:text-zinc-500 mt-1">
+        <div class="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
           多系统端到端对等穿透
         </div>
       </Card>
@@ -94,15 +94,15 @@
           v-model="searchQuery"
           type="text"
           placeholder="搜索主机名、设备 ID、系统..."
-          class="w-full pl-8 pr-3 py-1.5 text-xs rounded border border-slate-200 dark:border-[#262a33] bg-white dark:bg-[#191c22] text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-orange-500"
+          class="w-full pl-8 pr-3 py-1.5 text-xs rounded-md border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#162136] text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
       </div>
 
       <div class="flex items-center gap-2 self-end sm:self-auto">
-        <span class="text-xs text-slate-500 dark:text-zinc-400">系统筛选:</span>
+        <span class="text-xs text-slate-500 dark:text-slate-400">系统筛选:</span>
         <select
           v-model="osFilter"
-          class="px-2.5 py-1 text-xs rounded border border-slate-200 dark:border-[#262a33] bg-white dark:bg-[#191c22] text-slate-700 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-orange-500"
+          class="px-2.5 py-1 text-xs rounded-md border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#162136] text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
         >
           <option value="all">全部操作系统</option>
           <option value="linux">Linux</option>
@@ -183,10 +183,10 @@
 
               <!-- Heartbeat Status -->
               <td class="px-4 py-3">
-                <Badge :variant="isOnline(m.report_time) ? 'success' : 'neutral'" size="sm" dot>
-                  {{ isOnline(m.report_time) ? '在线 (Active)' : '离线' }}
+                <Badge :variant="isOnline(m.report_time) ? 'success' : 'danger'" size="sm" dot>
+                  {{ isOnline(m.report_time) ? '在线 (Active)' : '离线 (Lost)' }}
                 </Badge>
-                <span class="text-[10px] text-slate-400 ml-1.5 font-mono">
+                <span :class="['text-[10px] ml-1.5 font-mono', isOnline(m.report_time) ? 'text-slate-400' : 'text-red-500 font-medium']">
                   {{ formatReportTime(m.report_time) }}
                 </span>
               </td>
@@ -197,7 +197,7 @@
                   <span
                     v-for="instId in m.running_instances"
                     :key="instId"
-                    class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 border border-orange-200/60 dark:border-orange-800/40"
+                    class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/40"
                   >
                     {{ instId.slice(0, 8) }}
                   </span>
@@ -206,7 +206,7 @@
               </td>
 
               <!-- Physical Location -->
-              <td class="px-4 py-3 text-slate-500 dark:text-zinc-400 text-[11px]">
+              <td class="px-4 py-3 text-slate-500 dark:text-slate-400 text-[11px]">
                 {{ formatLocation(m.location) }}
               </td>
 
@@ -215,13 +215,13 @@
                 <div class="flex items-center justify-end gap-3">
                   <router-link
                     :to="{ path: '/diagnostics', query: { machine_id: m.machine_id } }"
-                    class="text-xs text-orange-600 dark:text-orange-400 hover:text-orange-700 font-medium"
+                    class="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 font-medium"
                   >
                     探针诊断
                   </router-link>
                   <router-link
                     :to="{ path: '/credentials', query: { machine_id: m.machine_id } }"
-                    class="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200"
+                    class="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
                   >
                     凭证
                   </router-link>

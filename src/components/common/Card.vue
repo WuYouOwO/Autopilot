@@ -12,7 +12,7 @@ withDefaults(
 <template>
   <div
     :class="[
-      'bg-white dark:bg-[#191c22] rounded-md border border-slate-200 dark:border-[#262a33] shadow-xs transition-all',
+      'bg-white dark:bg-[#162136] rounded-lg border border-slate-200/90 dark:border-[#23334d] shadow-xs transition-all',
       $props.class
     ]"
   >

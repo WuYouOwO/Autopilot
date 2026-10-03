@@ -3,15 +3,15 @@
     <!-- CF Page Header -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>
-        <div class="flex items-center gap-2 text-xs font-medium text-orange-600 dark:text-orange-400 mb-1">
+        <div class="flex items-center gap-2 text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">
           <Globe class="w-3.5 h-3.5" />
           <span>EDGE NETWORKS & ZERO TRUST</span>
         </div>
-        <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+        <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
           虚拟局域网络 (Virtual Networks)
         </h1>
-        <p class="text-xs text-slate-500 dark:text-zinc-400 mt-1">
-          当前网络: <span class="font-semibold text-slate-800 dark:text-zinc-200 font-mono">{{ activeNetName }}</span> · 去中心化 P2P 网状拓扑，自动穿透 NAT 与双栈 IPv6 直连。
+        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          当前网络: <span class="font-semibold text-slate-800 dark:text-slate-200 font-mono">{{ activeNetName }}</span> · 去中心化 P2P 网状拓扑，自动穿透 NAT 与双栈 IPv6 直连。
         </p>
       </div>
 
@@ -32,77 +32,92 @@
       </div>
     </div>
 
+    <!-- Overview Informational Callout (Cloudflare Banner Style) -->
+    <div class="p-3.5 rounded-lg bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/60 text-xs text-blue-950 dark:text-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5">
+        <Info class="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+        <span>
+          当前虚拟局域网已通过 <strong>Noise_IK</strong> 密码学套件实现端到端加密，对等节点自动探路并打洞建立 Direct P2P 隧道。
+        </span>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <span class="text-[11px] px-2 py-0.5 rounded-md bg-white dark:bg-blue-900/60 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-medium">
+          双栈 IPv6 完整保留
+        </span>
+      </div>
+    </div>
+
     <!-- CF Analytics KPI Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-      <Card class="p-4 border-slate-200 dark:border-[#262a33]">
-        <div class="flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400 font-medium">
+      <Card class="p-4 border-slate-200/90 dark:border-slate-800">
+        <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
           <span>网络节点规模</span>
           <Server class="w-4 h-4 text-slate-400" />
         </div>
-        <div class="text-2xl font-bold text-slate-900 dark:text-zinc-100 mt-2 flex items-baseline gap-2">
+        <div class="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-2 flex items-baseline gap-2">
           <span>{{ currentNet?.nodes?.length || 0 }}</span>
           <span class="text-xs font-normal text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
             {{ currentNet?.onlineNodes || 0 }} 在线
           </span>
         </div>
-        <div class="text-[11px] text-slate-400 dark:text-zinc-500 mt-1">
+        <div class="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
           跨地域端到端 Mesh 互通
         </div>
       </Card>
 
-      <Card class="p-4 border-slate-200 dark:border-[#262a33]">
-        <div class="flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400 font-medium">
+      <Card class="p-4 border-slate-200/90 dark:border-slate-800">
+        <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
           <span>P2P 直连率</span>
-          <Zap class="w-4 h-4 text-orange-500" />
+          <Zap class="w-4 h-4 text-blue-500" />
         </div>
-        <div class="text-2xl font-bold text-orange-600 dark:text-orange-400 mt-2">
+        <div class="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-2">
           {{ directPeerRate }}%
         </div>
-        <div class="text-[11px] text-slate-400 dark:text-zinc-500 mt-1">
+        <div class="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
           UDP/TCP 打洞直连链路
         </div>
       </Card>
 
-      <Card class="p-4 border-slate-200 dark:border-[#262a33]">
-        <div class="flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400 font-medium">
+      <Card class="p-4 border-slate-200/90 dark:border-slate-800">
+        <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
           <span>实时下行 / 上行流量</span>
           <ArrowDownUp class="w-4 h-4 text-blue-500" />
         </div>
-        <div class="text-sm font-bold text-slate-900 dark:text-zinc-100 mt-2 font-mono flex items-center gap-2">
+        <div class="text-sm font-bold text-slate-900 dark:text-slate-100 mt-2 font-mono flex items-center gap-2">
           <span class="text-emerald-600 dark:text-emerald-400">↓ {{ formatBytes(totalRxBytes) }}</span>
-          <span class="text-slate-300 dark:text-zinc-700">|</span>
-          <span class="text-orange-600 dark:text-orange-400">↑ {{ formatBytes(totalTxBytes) }}</span>
+          <span class="text-slate-300 dark:text-slate-700">|</span>
+          <span class="text-blue-600 dark:text-blue-400">↑ {{ formatBytes(totalTxBytes) }}</span>
         </div>
-        <div class="text-[11px] text-slate-400 dark:text-zinc-500 mt-1">
+        <div class="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
           全网累计加密传输总量
         </div>
       </Card>
 
-      <Card class="p-4 border-slate-200 dark:border-[#262a33]">
-        <div class="flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400 font-medium">
+      <Card class="p-4 border-slate-200/90 dark:border-slate-800">
+        <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
           <span>零信任安全防护</span>
           <ShieldCheck class="w-4 h-4 text-emerald-500" />
         </div>
-        <div class="text-sm font-bold text-slate-900 dark:text-zinc-100 mt-2 flex items-center gap-1.5">
+        <div class="text-sm font-bold text-slate-900 dark:text-slate-100 mt-2 flex items-center gap-1.5">
           <Badge variant="success" size="sm">已全局启用</Badge>
           <span class="text-xs font-normal text-slate-500">Noise_IK</span>
         </div>
-        <div class="text-[11px] text-slate-400 dark:text-zinc-500 mt-1">
+        <div class="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
           非对称公钥鉴权与动态流控
         </div>
       </Card>
     </div>
 
     <!-- CF Underline Tabs -->
-    <div class="border-b border-slate-200 dark:border-[#262a33] flex items-center gap-6 text-xs font-medium">
+    <div class="border-b border-slate-200/90 dark:border-slate-800 flex items-center gap-6 text-xs font-medium">
       <button
         @click="activeTab = 'topology'"
         :class="[
           'pb-3 pt-1 border-b-2 transition-all flex items-center gap-1.5',
           activeTab === 'topology'
-            ? 'border-[#f38020] text-[#f38020] font-bold'
-            : 'border-transparent text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
+            ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-bold'
+            : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
         ]"
       >
         <Network class="w-4 h-4" />
@@ -114,8 +129,8 @@
         :class="[
           'pb-3 pt-1 border-b-2 transition-all flex items-center gap-1.5',
           activeTab === 'nodes'
-            ? 'border-[#f38020] text-[#f38020] font-bold'
-            : 'border-transparent text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
+            ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-bold'
+            : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
         ]"
       >
         <ListFilter class="w-4 h-4" />
@@ -127,8 +142,8 @@
         :class="[
           'pb-3 pt-1 border-b-2 transition-all flex items-center gap-1.5',
           activeTab === 'toml'
-            ? 'border-[#f38020] text-[#f38020] font-bold'
-            : 'border-transparent text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
+            ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-bold'
+            : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
         ]"
       >
         <FileCode class="w-4 h-4" />
@@ -263,8 +278,8 @@
                 <!-- RX / TX -->
                 <td class="px-4 py-3 font-mono text-[11px]">
                   <span class="text-emerald-600 dark:text-emerald-400">↓ {{ formatBytes(node.downloadBytes) }}</span>
-                  <span class="mx-1 text-slate-300 dark:text-zinc-700">|</span>
-                  <span class="text-orange-600 dark:text-orange-400">↑ {{ formatBytes(node.uploadBytes) }}</span>
+                  <span class="mx-1 text-slate-300 dark:text-slate-700">|</span>
+                  <span class="text-blue-600 dark:text-blue-400">↑ {{ formatBytes(node.uploadBytes) }}</span>
                 </td>
 
                 <!-- Actions -->
@@ -272,7 +287,7 @@
                   <div class="flex items-center justify-end gap-1.5">
                     <router-link
                       :to="{ path: '/diagnostics', query: { machine_id: node.machineId } }"
-                      class="text-xs text-orange-600 dark:text-orange-400 hover:text-orange-700 font-medium"
+                      class="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 font-medium"
                     >
                       体检
                     </router-link>
@@ -287,14 +302,14 @@
 
     <!-- Tab 3: Native TOML Configuration Editor -->
     <div v-show="activeTab === 'toml'" class="space-y-4">
-      <Card class="border-slate-200 dark:border-[#262a33] p-5">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+      <Card class="border-slate-200/90 dark:border-slate-800 p-5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-3">
           <div>
-            <h3 class="text-sm font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
-              <FileCode class="w-4 h-4 text-[#f38020]" />
+            <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <FileCode class="w-4 h-4 text-blue-600 dark:text-blue-400" />
               无损原生 TOML 文本编辑 (Zero-Truncation Config)
             </h3>
-            <p class="text-xs text-slate-500 dark:text-zinc-400 mt-1">
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
               直接与 EasyTier 核心配置引擎通信。彻底消除官方前端表单截断 IPv6、丢弃未知字段的缺陷，完整支持自定义高级配置选项。
             </p>
           </div>
@@ -304,19 +319,27 @@
               <RefreshCw class="w-3.5 h-3.5 mr-1" />
               重新拉取
             </Button>
-            <Button variant="primary" size="sm" :loading="savingToml" @click="saveCurrentToml">
+            <Button variant="warning" size="sm" :loading="savingToml" @click="saveCurrentToml">
               <Save class="w-3.5 h-3.5 mr-1" />
               保存并下发生效
             </Button>
           </div>
         </div>
 
-        <div class="rounded border border-slate-200 dark:border-[#262a33] overflow-hidden bg-slate-950">
+        <!-- High-Impact Focal Callout -->
+        <div class="mb-3.5 p-3 rounded-lg bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-900/60 text-xs text-orange-900 dark:text-orange-200 flex items-center gap-2.5">
+          <AlertTriangle class="w-4 h-4 text-orange-600 dark:text-orange-400 shrink-0" />
+          <span>
+            <strong>重点提示：</strong>修改底层 TOML 将在保存后直接热推至该节点的运行时引擎，请特别注意验证双栈 IPv6 CIDR 与监听端口格式。
+          </span>
+        </div>
+
+        <div class="rounded-lg border border-slate-200/90 dark:border-slate-800 overflow-hidden bg-slate-950">
           <textarea
             v-model="rawTomlText"
             rows="16"
             spellcheck="false"
-            class="w-full p-4 font-mono text-xs bg-slate-950 text-emerald-400 focus:outline-none focus:ring-1 focus:ring-orange-500 selection:bg-orange-500 selection:text-white resize-y"
+            class="w-full p-4 font-mono text-xs bg-slate-950 text-emerald-400 focus:outline-none focus:ring-1 focus:ring-blue-500 selection:bg-blue-600 selection:text-white resize-y"
             placeholder="# 正在加载 EasyTier 节点 TOML 配置..."
           ></textarea>
         </div>
@@ -392,6 +415,8 @@ import {
   Laptop,
   Copy,
   Save,
+  Info,
+  AlertTriangle,
 } from 'lucide-vue-next'
 import Button from '@/components/common/Button.vue'
 import Card from '@/components/common/Card.vue'
@@ -516,9 +541,9 @@ function handleSelectNode(node: MeshNode) {
 
 function getLatencyClass(latencyUs: number): string {
   const ms = latencyUs / 1000
-  if (ms < 30) return 'text-emerald-500 font-semibold'
-  if (ms < 100) return 'text-orange-500'
-  return 'text-rose-500 font-semibold'
+  if (ms < 30) return 'text-emerald-600 dark:text-emerald-400 font-semibold'
+  if (ms < 80) return 'text-blue-600 dark:text-blue-400'
+  return 'text-orange-600 dark:text-orange-400 font-bold'
 }
 
 async function copyText(text: string, label: string) {

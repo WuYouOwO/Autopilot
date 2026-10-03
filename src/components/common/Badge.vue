@@ -3,7 +3,7 @@ import { computed } from 'vue'
 
 const props = withDefaults(
   defineProps<{
-    variant?: 'online' | 'relay' | 'offline' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'neutral' | 'cf' | 'blue'
+    variant?: 'online' | 'relay' | 'offline' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'neutral' | 'cf' | 'blue' | 'orange' | 'red'
     size?: 'sm' | 'md'
     dot?: boolean
     pulse?: boolean
@@ -24,38 +24,36 @@ const variantStyles = computed(() => {
         wrapper: 'bg-emerald-50 text-emerald-700 border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60',
         dotColor: 'bg-emerald-500',
       }
-    case 'cf':
     case 'primary':
-      return {
-        wrapper: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/50 dark:text-orange-300 dark:border-orange-800/60',
-        dotColor: 'bg-[#f38020]',
-      }
     case 'blue':
+    case 'cf':
       return {
         wrapper: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800/60',
         dotColor: 'bg-blue-500',
       }
-    case 'relay':
     case 'warning':
+    case 'orange':
+    case 'relay':
       return {
-        wrapper: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60',
-        dotColor: 'bg-amber-500',
+        wrapper: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/50 dark:text-orange-300 dark:border-orange-800/60',
+        dotColor: 'bg-orange-500',
       }
     case 'danger':
+    case 'red':
       return {
-        wrapper: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/60',
-        dotColor: 'bg-rose-500',
+        wrapper: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800/60',
+        dotColor: 'bg-red-500',
       }
     case 'offline':
     case 'neutral':
       return {
-        wrapper: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-zinc-800/80 dark:text-zinc-400 dark:border-zinc-700',
-        dotColor: 'bg-slate-400 dark:bg-zinc-500',
+        wrapper: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800/80 dark:text-slate-400 dark:border-slate-700',
+        dotColor: 'bg-slate-400 dark:bg-slate-500',
       }
     default:
       return {
-        wrapper: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700',
-        dotColor: 'bg-slate-400 dark:bg-zinc-400',
+        wrapper: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
+        dotColor: 'bg-slate-400 dark:bg-slate-400',
       }
   }
 })

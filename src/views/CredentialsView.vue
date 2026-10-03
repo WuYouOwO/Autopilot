@@ -3,14 +3,14 @@
     <!-- Header -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>
-        <div class="flex items-center gap-2 text-xs font-medium text-orange-600 dark:text-orange-400 mb-1">
+        <div class="flex items-center gap-2 text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">
           <Key class="w-3.5 h-3.5" />
           <span>ZERO TRUST SERVICE TOKENS</span>
         </div>
-        <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+        <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
           访问凭证与服务令牌 (Service Tokens)
         </h1>
-        <p class="text-xs text-slate-500 dark:text-zinc-400 mt-1">
+        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
           为计算设备与终端签发专属非对称公私钥访问凭据。支持按角色组绑定、限制代理 CIDR、设置有效时限并支持一键即时吊销。
         </p>
       </div>
@@ -18,11 +18,11 @@
       <div class="flex items-center gap-2.5">
         <!-- Target Machine Selector -->
         <div v-if="machineOptions.length > 0" class="flex items-center gap-2">
-          <span class="text-xs text-slate-500 dark:text-zinc-400">发行节点:</span>
+          <span class="text-xs text-slate-500 dark:text-slate-400">发行节点:</span>
           <select
             v-model="selectedMachineId"
             @change="fetchCredentials"
-            class="px-2.5 py-1 text-xs font-medium rounded border border-slate-200 dark:border-[#262a33] bg-white dark:bg-[#191c22] text-slate-700 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-orange-500"
+            class="px-2.5 py-1 text-xs font-medium rounded-md border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#162136] text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
           >
             <option v-for="m in machineOptions" :key="m.id" :value="m.id">
               {{ m.name }} ({{ m.os }})
@@ -41,12 +41,12 @@
       </div>
     </div>
 
-    <!-- Cloudflare Security Notice -->
-    <div class="rounded border border-orange-200 dark:border-orange-950/60 bg-orange-50/60 dark:bg-orange-950/20 p-4 text-xs leading-relaxed text-orange-950 dark:text-orange-200 flex items-start gap-3">
-      <ShieldCheck class="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
+    <!-- Security Notice (Cloudflare Pale Blue Style) -->
+    <div class="rounded-lg border border-blue-200/90 dark:border-blue-900/60 bg-blue-50/70 dark:bg-blue-950/30 p-4 text-xs leading-relaxed text-blue-950 dark:text-blue-200 flex items-start gap-3">
+      <ShieldCheck class="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
       <div>
         <span class="font-bold">云原生 PKI 边缘鉴权机制：</span>
-        通过 <code class="font-mono font-semibold bg-white/60 dark:bg-zinc-800 px-1 py-0.5 rounded">CredentialManageRpc</code> 签发的令牌内置独立的非对称密钥指纹。终端加入时直接与发行节点建立加密会话。一旦设备失窃或人员变动，仅需点击「吊销」，即可将其在全网剔除，无需重置网络共享密钥！
+        通过 <code class="font-mono font-semibold bg-white/70 dark:bg-slate-800 px-1 py-0.5 rounded border border-blue-200/60 dark:border-blue-800/60">CredentialManageRpc</code> 签发的令牌内置独立的非对称密钥指纹。终端加入时直接与发行节点建立加密会话。一旦设备失窃或人员变动，仅需点击「吊销」，即可将其在全网剔除，无需重置网络共享密钥！
       </div>
     </div>
 
@@ -174,7 +174,7 @@
             v-model="createForm.credential_id"
             type="text"
             placeholder="例如: laptop-macbook-pro 或留空系统自动生成 UUID"
-            class="w-full px-3 py-2 rounded border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-orange-500"
+            class="w-full px-3 py-2 rounded border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </div>
 
@@ -186,7 +186,7 @@
             v-model="createForm.groupsText"
             type="text"
             placeholder="例如: tag:finance, role:developer, group:guest"
-            class="w-full px-3 py-2 rounded border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-orange-500"
+            class="w-full px-3 py-2 rounded border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </div>
 
@@ -197,7 +197,7 @@
             </label>
             <select
               v-model="createForm.ttlSeconds"
-              class="w-full px-3 py-2 rounded border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-orange-500"
+              class="w-full px-3 py-2 rounded border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
               <option :value="3600">1 小时 (临时运维)</option>
               <option :value="86400">1 天</option>
@@ -214,7 +214,7 @@
             </label>
             <select
               v-model="createForm.reusable"
-              class="w-full px-3 py-2 rounded border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-orange-500"
+              class="w-full px-3 py-2 rounded border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
               <option :value="true">允许多设备复用</option>
               <option :value="false">单次加入 (激活后作废)</option>
@@ -230,7 +230,7 @@
             v-model="createForm.proxyCidrsText"
             type="text"
             placeholder="例如: 192.168.1.0/24, fd00:1::/64"
-            class="w-full px-3 py-2 font-mono rounded border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-orange-500"
+            class="w-full px-3 py-2 font-mono rounded border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </div>
 
@@ -239,7 +239,7 @@
             type="checkbox"
             id="allowRelay"
             v-model="createForm.allowRelay"
-            class="w-4 h-4 rounded text-orange-600 focus:ring-orange-500 border-slate-300 dark:border-zinc-700"
+            class="w-4 h-4 rounded text-orange-600 focus:ring-blue-500 border-slate-300 dark:border-zinc-700"
           />
           <label for="allowRelay" class="text-xs text-slate-700 dark:text-zinc-300 cursor-pointer">
             允许此设备充当中继节点 (Allow Relay)
