@@ -256,13 +256,63 @@ class ApiService {
   }
 
   // RPC 便捷调用：动态日志级别设置
-  public async setLoggerConfig(machineId: string, consoleLevel?: string, fileLevel?: string): Promise<any> {
+  public async setLoggerConfig(machineId: string, level: number): Promise<any> {
     return await this.proxyRpc(machineId, {
       service_name: 'api.logger.LoggerRpcService',
       method_name: 'set_logger_config',
       payload: {
-        console_log_level: consoleLevel,
-        file_log_level: fileLevel,
+        level,
+      },
+    })
+  }
+
+  public async getLoggerConfig(machineId: string): Promise<{ level?: number }> {
+    return await this.proxyRpc(machineId, {
+      service_name: 'api.logger.LoggerRpcService',
+      method_name: 'get_logger_config',
+      payload: {},
+    })
+  }
+
+  // RPC 便捷调用：运行时动态配置补丁 (ConfigRpcService)
+  public async patchConfig(machineId: string, patch: any, instName?: string): Promise<any> {
+    return await this.proxyRpc(machineId, {
+      service_name: 'api.config.ConfigRpcService',
+      method_name: 'patch_config',
+      payload: {
+        patch,
+        instance: instName ? { instance_selector: { name: instName } } : undefined,
+      },
+    })
+  }
+
+  public async getConfig(machineId: string, instName?: string): Promise<{ config?: any; toml_config?: string }> {
+    return await this.proxyRpc(machineId, {
+      service_name: 'api.config.ConfigRpcService',
+      method_name: 'get_config',
+      payload: {
+        instance: instName ? { instance_selector: { name: instName } } : undefined,
+      },
+    })
+  }
+
+  // RPC 便捷调用：零信任访问控制 (AclManageRpcService)
+  public async getAclStats(machineId: string, instName?: string): Promise<{ acl_stats?: any }> {
+    return await this.proxyRpc(machineId, {
+      service_name: 'api.instance.AclManageRpcService',
+      method_name: 'get_acl_stats',
+      payload: {
+        instance: instName ? { instance_selector: { name: instName } } : undefined,
+      },
+    })
+  }
+
+  public async getAclWhitelist(machineId: string, instName?: string): Promise<{ tcp_ports?: string[]; udp_ports?: string[] }> {
+    return await this.proxyRpc(machineId, {
+      service_name: 'api.instance.AclManageRpcService',
+      method_name: 'get_whitelist',
+      payload: {
+        instance: instName ? { instance_selector: { name: instName } } : undefined,
       },
     })
   }

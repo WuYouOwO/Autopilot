@@ -62,6 +62,7 @@
               <th class="px-4 py-3 font-semibold">源标签 (Source)</th>
               <th class="px-4 py-3 font-semibold">目标标签 (Destination)</th>
               <th class="px-4 py-3 font-semibold">协议 / 端口</th>
+              <th class="px-4 py-3 font-semibold">命中遥测 (Hits)</th>
               <th class="px-4 py-3 font-semibold text-center">启用状态</th>
               <th class="px-4 py-3 font-semibold text-right">操作</th>
             </tr>
@@ -106,6 +107,14 @@
               <td class="px-4 py-3 font-mono text-[11px]">
                 <span class="font-bold text-orange-600 dark:text-orange-400">{{ rule.proto.toUpperCase() }}</span>
                 <span class="ml-1 text-slate-500 dark:text-zinc-400">{{ rule.ports || '全部端口 (*)' }}</span>
+              </td>
+
+              <!-- Hit Telemetry -->
+              <td class="px-4 py-3 font-mono text-[11px]">
+                <span v-if="rule.packetCount !== undefined" class="text-orange-600 dark:text-orange-400 font-bold">
+                  {{ rule.packetCount }} pkts
+                </span>
+                <span v-else class="text-slate-400">0 pkts</span>
               </td>
 
               <!-- Enabled Toggle -->
@@ -226,7 +235,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import {
   Shield,
   ShieldCheck,
@@ -235,6 +244,7 @@ import {
   Send,
   Sliders,
   Trash2,
+  RefreshCw,
 } from 'lucide-vue-next'
 import Button from '@/components/common/Button.vue'
 import Card from '@/components/common/Card.vue'
@@ -256,6 +266,8 @@ interface PolicyRule {
   proto: string
   ports: string
   enabled: boolean
+  packetCount?: number
+  byteCount?: number
 }
 
 const policies = ref<PolicyRule[]>([
@@ -301,6 +313,31 @@ const newRule = ref<PolicyRule>({
   ports: '',
   enabled: true,
 })
+
+onMounted(async () => {
+  await networkStore.fetchSummary()
+  await fetchLiveAclStats()
+})
+
+async function fetchLiveAclStats() {
+  if (networkStore.deviceList.length === 0) return
+  const firstMachine = networkStore.deviceList[0].machine_id
+  try {
+    const res = await api.getAclStats(firstMachine)
+    if (res?.acl_stats?.rules) {
+      const statsRules = res.acl_stats.rules
+      for (const rule of policies.value) {
+        const found = statsRules.find((sr: any) => sr.rule?.name === rule.name)
+        if (found && found.stat) {
+          rule.packetCount = found.stat.packet_count || 0
+          rule.byteCount = found.stat.byte_count || 0
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn('Failed to fetch ACL stats:', err)
+  }
+}
 
 function openAddModal() {
   newRule.value = {
@@ -357,27 +394,82 @@ async function deployAllPolicies() {
       return
     }
 
+    const protoMap: Record<string, number> = {
+      all: 5,
+      tcp: 1,
+      udp: 2,
+      icmp: 3,
+    }
+    const actionMap: Record<string, number> = {
+      accept: 1,
+      drop: 2,
+    }
+
+    const activeRules = policies.value
+      .filter((r) => r.enabled)
+      .map((r, index) => {
+        const portsArr = r.ports && r.ports !== '*' ? r.ports.split(',').map((p) => p.trim()).filter(Boolean) : []
+        const srcGroups = r.srcTag && r.srcTag !== '*' ? [r.srcTag] : []
+        const dstGroups = r.dstTag && r.dstTag !== '*' ? [r.dstTag] : []
+
+        return {
+          name: r.name || `Rule #${index + 1}`,
+          description: `Cloudflare Zero Trust Rule: ${r.name}`,
+          priority: 100 - index,
+          enabled: r.enabled,
+          protocol: protoMap[r.proto.toLowerCase()] ?? 5,
+          ports: portsArr,
+          source_ips: [],
+          destination_ips: [],
+          source_ports: [],
+          source_groups: srcGroups,
+          destination_groups: dstGroups,
+          action: actionMap[r.action] ?? 1,
+          rate_limit: 0,
+          burst_limit: 0,
+          stateful: false,
+        }
+      })
+
+    const patch = {
+      port_forwards: [],
+      proxy_networks: [],
+      routes: [],
+      exit_nodes: [],
+      mapped_listeners: [],
+      connectors: [],
+      vpn_portal_clients: [],
+      acl: {
+        acl: {
+          acl_v1: {
+            chains: [
+              {
+                name: 'inbound',
+                chain_type: 1,
+                description: 'Cloudflare Zero Trust Inbound Access Rules',
+                enabled: true,
+                rules: activeRules,
+                default_action: 1,
+              },
+            ],
+          },
+        },
+        tcp_whitelist: [],
+        udp_whitelist: [],
+      },
+    }
+
     let successCount = 0
     for (const d of devices) {
       try {
-        await api.proxyRpc(d.machine_id, {
-          service_name: 'api.instance.AclManageRpcService',
-          method_name: 'set_acl_rules',
-          payload: {
-            rules: policies.value.filter((r) => r.enabled).map((r) => ({
-              action: r.action === 'accept' ? 0 : 1,
-              src_group: r.srcTag === '*' ? undefined : r.srcTag,
-              dst_group: r.dstTag === '*' ? undefined : r.dstTag,
-              protocol: r.proto === 'all' ? undefined : r.proto,
-            })),
-          },
-        })
+        await api.patchConfig(d.machine_id, patch)
         successCount++
       } catch (e) {
         console.warn('Deploy policy to machine failed:', d.machine_id, e)
       }
     }
 
+    await fetchLiveAclStats()
     alert(`零信任 ACL 策略已成功下发至 ${successCount}/${devices.length} 台边缘节点！`)
   } catch (err: any) {
     alert('分发失败: ' + (err?.response?.data?.message || err?.message))

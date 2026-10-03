@@ -61,15 +61,15 @@
             <div class="flex items-center gap-1.5">
               <span class="text-xs text-slate-500 dark:text-zinc-400">日志级别:</span>
               <select
-                v-model="loggerConfig.consoleLevel"
+                v-model.number="loggerConfig.level"
                 class="px-2.5 py-1 text-xs font-mono font-medium rounded border border-slate-200 dark:border-[#262a33] bg-white dark:bg-[#191c22] text-slate-700 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-orange-500"
               >
-                <option value="trace">TRACE (极详尽)</option>
-                <option value="debug">DEBUG (调试)</option>
-                <option value="info">INFO (常规)</option>
-                <option value="warn">WARN (警告)</option>
-                <option value="error">ERROR (仅错误)</option>
-                <option value="off">OFF (关闭)</option>
+                <option :value="5">TRACE (5 - 极详尽)</option>
+                <option :value="4">DEBUG (4 - 调试)</option>
+                <option :value="3">INFO (3 - 常规)</option>
+                <option :value="2">WARN (2 - 警告)</option>
+                <option :value="1">ERROR (1 - 仅错误)</option>
+                <option :value="0">DISABLED (0 - 关闭)</option>
               </select>
             </div>
 
@@ -269,8 +269,7 @@ const selectedMachineId = ref('')
 
 // Logger config
 const loggerConfig = ref({
-  consoleLevel: 'info',
-  fileLevel: 'info',
+  level: 3,
 })
 const updatingLogger = ref(false)
 
@@ -308,11 +307,24 @@ async function runFullDiagnostics() {
   if (!selectedMachineId.value) return
   loading.value = true
   await Promise.allSettled([
+    fetchLoggerConfig(),
     fetchConnectors(),
     fetchPeers(),
     fetchMetrics(),
   ])
   loading.value = false
+}
+
+async function fetchLoggerConfig() {
+  if (!selectedMachineId.value) return
+  try {
+    const res = await api.getLoggerConfig(selectedMachineId.value)
+    if (res && res.level !== undefined) {
+      loggerConfig.value.level = res.level
+    }
+  } catch (err: any) {
+    console.error('Failed to get logger config:', err)
+  }
 }
 
 async function fetchConnectors() {
@@ -363,10 +375,17 @@ async function applyLoggerConfig() {
   try {
     await api.setLoggerConfig(
       selectedMachineId.value,
-      loggerConfig.value.consoleLevel,
-      loggerConfig.value.fileLevel
+      loggerConfig.value.level
     )
-    alert(`日志级别已成功更新为: ${loggerConfig.value.consoleLevel.toUpperCase()}`)
+    const levelNames: Record<number, string> = {
+      0: 'DISABLED (0)',
+      1: 'ERROR (1)',
+      2: 'WARN (2)',
+      3: 'INFO (3)',
+      4: 'DEBUG (4)',
+      5: 'TRACE (5)',
+    }
+    alert(`日志级别已成功更新为: ${levelNames[loggerConfig.value.level] || loggerConfig.value.level}`)
   } catch (err: any) {
     alert('设置日志失败: ' + (err?.response?.data?.message || err?.message))
   } finally {
