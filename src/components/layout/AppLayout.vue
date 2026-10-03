@@ -13,12 +13,16 @@ usePolling(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 dark:bg-zinc-950 flex flex-col font-sans transition-colors duration-150">
+  <div class="min-h-screen bg-slate-50 dark:bg-[#0c1322] flex flex-col font-sans transition-colors duration-150">
     <AppHeader />
     <div class="flex-1 flex max-w-7xl w-full mx-auto">
       <AppSidebar />
       <main class="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 overflow-y-auto">
-        <router-view />
+        <router-view v-slot="{ Component }">
+          <transition name="page-fade" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </router-view>
       </main>
     </div>
   </div>

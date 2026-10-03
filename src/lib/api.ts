@@ -238,11 +238,13 @@ class ApiService {
   }
 
   // RPC 便捷调用：全局网络拓扑
-  public async getGlobalPeerMap(machineId: string): Promise<any> {
+  public async getGlobalPeerMap(machineId: string, digest: number = 0): Promise<any> {
     return await this.proxyRpc(machineId, {
       service_name: 'api.instance.PeerCenterManageRpcService',
       method_name: 'get_global_peer_map',
-      payload: {},
+      payload: {
+        digest,
+      },
     })
   }
 

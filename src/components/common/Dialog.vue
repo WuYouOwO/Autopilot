@@ -14,41 +14,45 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-    <!-- 背景遮罩 -->
-    <div
-      class="fixed inset-0 bg-slate-900/40 dark:bg-black/70 backdrop-blur-sm transition-opacity"
-      @click="emit('close')"
-    />
-
-    <!-- 对话框主体 -->
-    <div
-      :class="[
-        'relative z-10 w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-xl dark:shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150',
-        maxWidth || 'max-w-lg'
-      ]"
-    >
-      <div class="px-6 py-4.5 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between">
-        <div>
-          <h3 v-if="title" class="text-base font-semibold text-slate-900 dark:text-zinc-100">{{ title }}</h3>
-          <p v-if="description" class="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">{{ description }}</p>
-        </div>
-        <button
-          type="button"
+  <Teleport to="body">
+    <Transition name="dialog-fade">
+      <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <!-- 背景遮罩 -->
+        <div
+          class="fixed inset-0 bg-slate-900/40 dark:bg-black/75 backdrop-blur-xs transition-opacity"
           @click="emit('close')"
-          class="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-800 transition-colors"
+        />
+
+        <!-- 对话框主体 -->
+        <div
+          :class="[
+            'dialog-panel relative z-10 w-full bg-white dark:bg-[#162136] border border-slate-200/90 dark:border-[#23334d] rounded-xl shadow-xl dark:shadow-2xl overflow-hidden',
+            maxWidth || 'max-w-lg'
+          ]"
         >
-          <X class="w-4 h-4" />
-        </button>
-      </div>
+          <div class="px-6 py-4.5 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
+            <div>
+              <h3 v-if="title" class="text-base font-semibold text-slate-900 dark:text-slate-100">{{ title }}</h3>
+              <p v-if="description" class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{{ description }}</p>
+            </div>
+            <button
+              type="button"
+              @click="emit('close')"
+              class="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/60 transition-colors"
+            >
+              <X class="w-4 h-4" />
+            </button>
+          </div>
 
-      <div class="p-6">
-        <slot />
-      </div>
+          <div class="p-6">
+            <slot />
+          </div>
 
-      <div v-if="$slots.footer" class="px-6 py-3.5 bg-slate-50/70 dark:bg-zinc-900/50 border-t border-slate-100 dark:border-zinc-800 flex items-center justify-end gap-2.5">
-        <slot name="footer" />
+          <div v-if="$slots.footer" class="px-6 py-3.5 bg-slate-50/80 dark:bg-[#121c2e] border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-end gap-2.5">
+            <slot name="footer" />
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
+    </Transition>
+  </Teleport>
 </template>

@@ -92,7 +92,7 @@ export const useNetworkStore = defineStore('network', () => {
     const networks: Record<string, MeshNetwork> = {}
 
     machines.value.forEach((m) => {
-      const mid = m.info?.machine_id
+      const mid = uuidToStr(m.info?.machine_id)
       if (!mid) return
 
       const instances = machineNetworkInfos.value[mid] || {}

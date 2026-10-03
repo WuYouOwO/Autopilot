@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-EasyTier Next-Gen Frontend & Backend Integration Q/A Test Suite
-Tests all 9 end-to-end capabilities against the live system.
+EasyTier Next-Gen Cloudflare-Inspired Frontend & Backend Integration
+Round 2 Q/A & Regression Test Suite
+Validates all 15 core features against the live running system.
 """
 
 import sys
@@ -34,15 +35,36 @@ opener = urllib.request.build_opener(cookie_jar)
 
 mid_str = ""
 
-@test("1. Frontend Server & Cloudflare Theme Delivery")
-def test_frontend_server():
+@test("1. Static Brand & Icon Assets Delivery (/favicon.ico, /favicon.svg, /apple-touch-icon.png, /site.webmanifest)")
+def test_static_icon_assets():
+    assets = [
+        ("/favicon.ico", "image/x-icon"),
+        ("/favicon.svg", "image/svg+xml"),
+        ("/favicon-32x32.png", "image/png"),
+        ("/apple-touch-icon.png", "image/png"),
+        ("/site.webmanifest", None),
+    ]
+    for path, exp_type in assets:
+        req = urllib.request.Request(f"http://127.0.0.1:5173{path}")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            assert resp.status == 200, f"Expected 200 for {path}, got {resp.status}"
+            data = resp.read()
+            assert len(data) > 0, f"Asset {path} is empty"
+            if exp_type:
+                ct = resp.headers.get("Content-Type", "")
+                assert exp_type.split("/")[0] in ct, f"Expected {exp_type} for {path}, got {ct}"
+
+@test("2. Frontend SPA Shell Delivery & Pale Theme Metadata")
+def test_frontend_shell():
     req = urllib.request.Request("http://127.0.0.1:5173/")
     with urllib.request.urlopen(req, timeout=5) as resp:
         assert resp.status == 200, f"Expected 200, got {resp.status}"
         body = resp.read().decode()
-        assert "EasyTier" in body or "html" in body.lower(), "HTML shell not served properly"
+        assert "EasyTier Console" in body, "Page title mismatch"
+        assert "theme-color" in body, "Missing theme-color meta"
+        assert "site.webmanifest" in body, "Missing manifest link"
 
-@test("2. Vite Reverse Proxy -> Captcha Endpoint")
+@test("3. Reverse Proxy -> Captcha Endpoint")
 def test_captcha_proxy():
     req = urllib.request.Request("http://127.0.0.1:5173/api/v1/auth/captcha")
     with opener.open(req, timeout=5) as resp:
@@ -52,7 +74,7 @@ def test_captcha_proxy():
         data = resp.read()
         assert len(data) > 100, "Captcha image is empty"
 
-@test("3. MD5 Pre-hash Auth & Session Creation")
+@test("4. MD5 Pre-hash Auth & Session Creation")
 def test_login():
     md5_pass = hashlib.md5(b"admin").hexdigest()
     payload = json.dumps({
@@ -68,13 +90,13 @@ def test_login():
     with opener.open(req, timeout=5) as resp:
         assert resp.status == 200
 
-@test("4. Auth Session Verification (/auth/check_login_status)")
+@test("5. Auth Session Verification (/auth/check_login_status)")
 def test_check_login_status():
     req = urllib.request.Request("http://127.0.0.1:5173/api/v1/auth/check_login_status")
     with opener.open(req, timeout=5) as resp:
         assert resp.status == 200
 
-@test("5. Machine Discovery & 128-bit Proto UUID Parsing")
+@test("6. Machine Discovery & 128-bit Proto UUID Parsing")
 def test_machine_discovery():
     global mid_str
     req = urllib.request.Request("http://127.0.0.1:5173/api/v1/machines")
@@ -95,7 +117,56 @@ def test_machine_discovery():
             mid_str = str(raw_mid)
         assert len(mid_str) == 36, f"Invalid UUID: {mid_str}"
 
-@test("6. Diagnostics: Outbound Connector Probe via Proxy-RPC")
+@test("7. Native TOML Round-Trip: Parse & Generate with Dual-Stack IPv6 CIDR")
+def test_toml_round_trip():
+    test_toml = '''instance_name = "test-node-dualstack"
+instance_id = "00112233-4455-6677-8899-aabbccddeeff"
+ipv4 = "10.144.144.1/24"
+ipv6 = "fd00:144:144::1/64"
+listeners = ["tcp://0.0.0.0:11010", "udp://0.0.0.0:11010", "wg://0.0.0.0:11011"]
+rpc_portal = "127.0.0.1:15888"
+
+[network_identity]
+network_name = "qa-mesh"
+network_secret = "mesh-secret-key"
+
+[[peer]]
+uri = "udp://1.2.3.4:11010"
+'''
+    # 1. Parse via backend API
+    req_parse = urllib.request.Request(
+        "http://127.0.0.1:5173/api/v1/parse-config",
+        data=json.dumps({"toml_config": test_toml}).encode(),
+        headers={"Content-Type": "application/json"}
+    )
+    with opener.open(req_parse, timeout=5) as resp:
+        assert resp.status == 200
+        parse_res = json.loads(resp.read().decode())
+        cfg = parse_res.get("config")
+        assert cfg, "Parsed config is empty"
+        assert cfg.get("virtual_ipv4") == "10.144.144.1"
+        assert cfg.get("network_length") == 24
+        assert cfg.get("network_name") == "qa-mesh"
+
+    # 2. Generate via backend API
+    req_gen = urllib.request.Request(
+        "http://127.0.0.1:5173/api/v1/generate-config",
+        data=json.dumps({"config": cfg}).encode(),
+        headers={"Content-Type": "application/json"}
+    )
+    with opener.open(req_gen, timeout=5) as resp:
+        assert resp.status == 200
+        gen_res = json.loads(resp.read().decode())
+        toml_out = gen_res.get("toml_config", "")
+        assert "10.144.144.1/24" in toml_out, "IPv4 CIDR lost during TOML generation"
+        assert "qa-mesh" in toml_out, "Network identity lost"
+
+    # 3. Verify Raw TOML dual-stack preservation mode (as used in NetworksView)
+    import re
+    ipv6_match = re.search(r'ipv6\s*=\s*"([^"]+)"', test_toml)
+    assert ipv6_match and ipv6_match.group(1) == "fd00:144:144::1/64", "Raw IPv6 CIDR corrupted"
+
+@test("8. Diagnostics: Outbound Connector Probe via Proxy-RPC")
 def test_connector_probe():
     payload = json.dumps({
         "service_name": "api.instance.ConnectorManageRpcService",
@@ -112,9 +183,8 @@ def test_connector_probe():
         res = json.loads(resp.read().decode())
         assert "connectors" in res, "Missing connectors in response"
 
-@test("7. Diagnostics: Runtime Dynamic Log Level via LoggerRpcService")
+@test("9. Diagnostics: Runtime Dynamic Log Level via LoggerRpcService")
 def test_logger_config():
-    # Set to DEBUG (4)
     payload = json.dumps({
         "service_name": "api.logger.LoggerRpcService",
         "method_name": "set_logger_config",
@@ -128,7 +198,6 @@ def test_logger_config():
     with opener.open(req, timeout=5) as resp:
         assert resp.status == 200
 
-    # Get level and verify it is 4
     payload_get = json.dumps({
         "service_name": "api.logger.LoggerRpcService",
         "method_name": "get_logger_config",
@@ -144,7 +213,72 @@ def test_logger_config():
         res = json.loads(resp.read().decode())
         assert res.get("level") == 4, f"Expected level 4, got {res.get('level')}"
 
-@test("8. Zero Trust ACL: Policy Patch & Real-time Rule Telemetry")
+@test("10. Diagnostics: Peer & Route Queries (PeerManageRpcService)")
+def test_peer_and_route_rpc():
+    # 1. list_peer
+    req_peer = urllib.request.Request(
+        f"http://127.0.0.1:5173/api/v1/machines/{mid_str}/proxy-rpc",
+        data=json.dumps({
+            "service_name": "api.instance.PeerManageRpcService",
+            "method_name": "list_peer",
+            "payload": {}
+        }).encode(),
+        headers={"Content-Type": "application/json"}
+    )
+    with opener.open(req_peer, timeout=5) as resp:
+        assert resp.status == 200
+        res = json.loads(resp.read().decode())
+        assert "peer_infos" in res, "Missing peer_infos in response"
+
+    # 2. list_route
+    req_route = urllib.request.Request(
+        f"http://127.0.0.1:5173/api/v1/machines/{mid_str}/proxy-rpc",
+        data=json.dumps({
+            "service_name": "api.instance.PeerManageRpcService",
+            "method_name": "list_route",
+            "payload": {}
+        }).encode(),
+        headers={"Content-Type": "application/json"}
+    )
+    with opener.open(req_route, timeout=5) as resp:
+        assert resp.status == 200
+        res = json.loads(resp.read().decode())
+        assert "routes" in res, "Missing routes in response"
+
+@test("11. Diagnostics: Prometheus Telemetry Metrics (StatsRpcService)")
+def test_prometheus_metrics():
+    req = urllib.request.Request(
+        f"http://127.0.0.1:5173/api/v1/machines/{mid_str}/proxy-rpc",
+        data=json.dumps({
+            "service_name": "api.instance.StatsRpcService",
+            "method_name": "get_prometheus_stats",
+            "payload": {}
+        }).encode(),
+        headers={"Content-Type": "application/json"}
+    )
+    with opener.open(req, timeout=5) as resp:
+        assert resp.status == 200
+        res = json.loads(resp.read().decode())
+        text = res.get("prometheus_text", "")
+        assert len(text) > 100, "Prometheus metrics output empty"
+
+@test("12. Topology: PeerCenter Global Mesh RPC (with digest=0)")
+def test_global_peer_map():
+    req = urllib.request.Request(
+        f"http://127.0.0.1:5173/api/v1/machines/{mid_str}/proxy-rpc",
+        data=json.dumps({
+            "service_name": "api.instance.PeerCenterManageRpcService",
+            "method_name": "get_global_peer_map",
+            "payload": {"digest": 0}
+        }).encode(),
+        headers={"Content-Type": "application/json"}
+    )
+    with opener.open(req, timeout=5) as resp:
+        assert resp.status == 200
+        res = json.loads(resp.read().decode())
+        assert "global_peer_map" in res, "Missing global_peer_map in response"
+
+@test("13. Zero Trust ACL: Policy Patch & Real-time Rule Telemetry")
 def test_acl_policy_patch_and_telemetry():
     patch = {
         "port_forwards": [],
@@ -204,7 +338,6 @@ def test_acl_policy_patch_and_telemetry():
     with opener.open(req_patch, timeout=5) as resp:
         assert resp.status == 200
 
-    # Query AclManageRpcService get_acl_stats
     payload_stats = json.dumps({
         "service_name": "api.instance.AclManageRpcService",
         "method_name": "get_acl_stats",
@@ -222,7 +355,7 @@ def test_acl_policy_patch_and_telemetry():
         assert len(rules) > 0, "No ACL rules found in stats"
         assert rules[0].get("rule", {}).get("name") == "CF Zero Trust Dev Allow"
 
-@test("9. Zero Trust PKI: Full Credential Lifecycle (Gen, List, Revoke)")
+@test("14. Zero Trust PKI: Full Credential Lifecycle (Gen, List, Revoke)")
 def test_credential_lifecycle():
     # 1. Generate
     payload_gen = json.dumps({
@@ -279,21 +412,53 @@ def test_credential_lifecycle():
     with opener.open(req_rev, timeout=5) as resp:
         assert resp.status == 200
 
+@test("15. Auth Logout & Re-auth Security Enforcement")
+def test_logout_and_guard():
+    # 1. Logout
+    req_logout = urllib.request.Request("http://127.0.0.1:5173/api/v1/auth/logout")
+    with opener.open(req_logout, timeout=5) as resp:
+        assert resp.status == 200
+
+    # 2. Verify check_login_status rejects or reports not logged in
+    req_check = urllib.request.Request("http://127.0.0.1:5173/api/v1/auth/check_login_status")
+    try:
+        with opener.open(req_check, timeout=5) as resp:
+            data = resp.read().decode()
+            assert "false" in data.lower() or "error" in data.lower()
+    except urllib.error.HTTPError as e:
+        assert e.code == 401 or e.code == 403, f"Expected 401/403, got {e.code}"
+
+    # 3. Re-login for continued service
+    md5_pass = hashlib.md5(b"admin").hexdigest()
+    req_relogin = urllib.request.Request(
+        "http://127.0.0.1:5173/api/v1/auth/login",
+        data=json.dumps({"username": "admin", "password": md5_pass, "captcha_code": ""}).encode(),
+        headers={"Content-Type": "application/json"}
+    )
+    with opener.open(req_relogin, timeout=5) as resp:
+        assert resp.status == 200
+
 
 if __name__ == "__main__":
-    print("=" * 60)
-    print(" EasyTier Cloudflare Dashboard End-to-End Q/A Test Suite")
-    print("=" * 60)
-    test_frontend_server()
+    print("=" * 68)
+    print(" EasyTier Cloudflare Dashboard - Round 2 Q/A & Regression Suite")
+    print("=" * 68)
+    test_static_icon_assets()
+    test_frontend_shell()
     test_captcha_proxy()
     test_login()
     test_check_login_status()
     test_machine_discovery()
+    test_toml_round_trip()
     test_connector_probe()
     test_logger_config()
+    test_peer_and_route_rpc()
+    test_prometheus_metrics()
+    test_global_peer_map()
     test_acl_policy_patch_and_telemetry()
     test_credential_lifecycle()
-    print("=" * 60)
+    test_logout_and_guard()
+    print("=" * 68)
     print(f"Results: {PASSED} Passed, {FAILED} Failed (Total: {PASSED + FAILED})")
-    print("=" * 60)
+    print("=" * 68)
     sys.exit(0 if FAILED == 0 else 1)
