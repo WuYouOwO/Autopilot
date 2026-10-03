@@ -3,23 +3,26 @@
     <!-- Header -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-zinc-100 flex items-center gap-2.5">
-          <Activity class="w-6 h-6 text-indigo-500" />
-          节点排障与运行体检中心
+        <div class="flex items-center gap-2 text-xs font-medium text-orange-600 dark:text-orange-400 mb-1">
+          <ActivitySquare class="w-3.5 h-3.5" />
+          <span>NETWORK TRACE & TELEMETRY</span>
+        </div>
+        <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+          链路探针与运行诊断 (Diagnostics)
         </h1>
-        <p class="text-sm text-slate-500 dark:text-zinc-400 mt-1">
+        <p class="text-xs text-slate-500 dark:text-zinc-400 mt-1">
           穿透后端 RPC 实时探针。即时排查出站连接器状态、P2P 隧道加密、路由跳数及动态热切换日志等级。
         </p>
       </div>
 
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2.5">
         <!-- Target Machine Selector -->
         <div v-if="machineOptions.length > 0" class="flex items-center gap-2">
-          <span class="text-xs text-slate-500 dark:text-zinc-400">诊断节点:</span>
+          <span class="text-xs text-slate-500 dark:text-zinc-400">诊断目标:</span>
           <select
             v-model="selectedMachineId"
             @change="runFullDiagnostics"
-            class="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            class="px-2.5 py-1 text-xs font-medium rounded border border-slate-200 dark:border-[#262a33] bg-white dark:bg-[#191c22] text-slate-700 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-orange-500"
           >
             <option v-for="m in machineOptions" :key="m.id" :value="m.id">
               {{ m.name }} ({{ m.os }})
@@ -27,27 +30,27 @@
           </select>
         </div>
 
-        <Button variant="secondary" size="sm" :loading="loading" @click="runFullDiagnostics">
-          <RefreshCw class="w-4 h-4 mr-1.5" />
-          全量体检
+        <Button variant="primary" size="sm" :loading="loading" @click="runFullDiagnostics">
+          <RefreshCw class="w-3.5 h-3.5 mr-1" />
+          全量深度体检
         </Button>
       </div>
     </div>
 
     <div v-if="!selectedMachineId" class="py-16 text-center">
-      <ServerOff class="w-10 h-10 mx-auto text-slate-300 dark:text-zinc-600 mb-3" />
-      <p class="text-sm font-medium text-slate-700 dark:text-zinc-300">暂无在线节点可供诊断</p>
-      <p class="text-xs text-slate-500 dark:text-zinc-400 mt-1">请先在「物理设备」或「网络互联」中连接节点并上报心跳。</p>
+      <ServerOff class="w-10 h-10 mx-auto text-slate-300 dark:text-zinc-600 mb-2" />
+      <p class="text-sm font-semibold text-slate-700 dark:text-zinc-300">暂无在线节点可供诊断</p>
+      <p class="text-xs text-slate-500 dark:text-zinc-400 mt-1">请先在「物理设备」或「虚拟网络」中接入节点并上报心跳。</p>
     </div>
 
     <div v-else class="space-y-6">
       <!-- Section 1: Live Log Level Hot-Toggling -->
-      <Card class="border border-slate-200 dark:border-zinc-800 p-5">
+      <Card class="border-slate-200 dark:border-[#262a33] p-5">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div class="space-y-1">
             <h3 class="text-sm font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
-              <ScrollText class="w-4 h-4 text-indigo-500" />
-              运行时日志热切换 (Dynamic Logger Config)
+              <ScrollText class="w-4 h-4 text-[#f38020]" />
+              运行时动态日志热切换 (Dynamic Log Level)
             </h3>
             <p class="text-xs text-slate-500 dark:text-zinc-400">
               通过 LoggerRpc 动态修改终端进程运行日志级别，无需重启节点进程即可捕获 Trace/Debug 详细连接追踪。
@@ -56,11 +59,10 @@
 
           <div class="flex items-center gap-3">
             <div class="flex items-center gap-1.5">
-              <span class="text-xs text-slate-500 dark:text-zinc-400">控制台日志:</span>
+              <span class="text-xs text-slate-500 dark:text-zinc-400">日志级别:</span>
               <select
                 v-model="loggerConfig.consoleLevel"
-                @change="applyLoggerConfig"
-                class="px-2.5 py-1 text-xs font-mono font-medium rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                class="px-2.5 py-1 text-xs font-mono font-medium rounded border border-slate-200 dark:border-[#262a33] bg-white dark:bg-[#191c22] text-slate-700 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-orange-500"
               >
                 <option value="trace">TRACE (极详尽)</option>
                 <option value="debug">DEBUG (调试)</option>
@@ -71,7 +73,7 @@
               </select>
             </div>
 
-            <Button variant="secondary" size="sm" :loading="updatingLogger" @click="applyLoggerConfig">
+            <Button variant="primary" size="sm" :loading="updatingLogger" @click="applyLoggerConfig">
               应用生效
             </Button>
           </div>
@@ -79,19 +81,19 @@
       </Card>
 
       <!-- Section 2: Outbound Connector Status Inspector -->
-      <Card class="border border-slate-200 dark:border-zinc-800 overflow-hidden">
-        <div class="p-4 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between">
+      <Card class="border-slate-200 dark:border-[#262a33] overflow-hidden">
+        <div class="p-4 border-b border-slate-100 dark:border-[#262a33] flex items-center justify-between">
           <div class="flex items-center gap-2">
             <Radio class="w-4 h-4 text-emerald-500" />
             <h3 class="text-sm font-bold text-slate-900 dark:text-zinc-100">出站连接器状态探针 (Connectors)</h3>
           </div>
-          <Badge variant="neutral" size="sm">
+          <Badge variant="cf" size="sm">
             {{ connectors.length }} 个出站连接
           </Badge>
         </div>
 
         <div v-if="connectorsLoading" class="p-8 text-center text-xs text-slate-400">
-          <Loader2 class="w-5 h-5 mx-auto animate-spin mb-2 text-indigo-500" />
+          <Loader2 class="w-5 h-5 mx-auto animate-spin mb-2 text-orange-500" />
           正在读取连接器状态...
         </div>
         <div v-else-if="connectors.length === 0" class="p-8 text-center text-xs text-slate-400 dark:text-zinc-500">
@@ -99,30 +101,30 @@
         </div>
         <div v-else class="overflow-x-auto">
           <table class="w-full text-left text-xs">
-            <thead class="bg-slate-50 dark:bg-zinc-800/60 text-slate-500 dark:text-zinc-400 border-b border-slate-200 dark:border-zinc-800">
+            <thead class="bg-slate-50 dark:bg-[#191c22] text-slate-500 dark:text-zinc-400 border-b border-slate-200 dark:border-[#262a33]">
               <tr>
-                <th class="px-4 py-2.5 font-medium">协议 / 目标 URL</th>
-                <th class="px-4 py-2.5 font-medium">连接状态</th>
-                <th class="px-4 py-2.5 font-medium">传输特征</th>
+                <th class="px-4 py-2.5 font-semibold">协议 / 目标 URL</th>
+                <th class="px-4 py-2.5 font-semibold">连接状态</th>
+                <th class="px-4 py-2.5 font-semibold">传输通道说明</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100 dark:divide-zinc-800 text-slate-700 dark:text-zinc-300">
-              <tr v-for="(conn, idx) in connectors" :key="idx" class="hover:bg-slate-50/50 dark:hover:bg-zinc-800/40">
+            <tbody class="divide-y divide-slate-100 dark:divide-[#262a33] text-slate-700 dark:text-zinc-300">
+              <tr v-for="(conn, idx) in connectors" :key="idx" class="hover:bg-slate-50/60 dark:hover:bg-zinc-800/40">
                 <td class="px-4 py-3 font-mono font-medium text-slate-900 dark:text-zinc-100">
                   <div class="flex items-center gap-2">
                     <span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider" :class="getProtoBadgeClass(conn.url?.scheme || conn.url)">
-                      {{ conn.url?.scheme || getScheme(conn.url) || 'TCP' }}
+                      {{ conn.url?.scheme || getScheme(conn.url) || 'UDP' }}
                     </span>
                     <span>{{ formatConnUrl(conn.url) }}</span>
                   </div>
                 </td>
                 <td class="px-4 py-3">
-                  <Badge :variant="conn.status === 0 || conn.status === 'CONNECTED' ? 'success' : conn.status === 2 || conn.status === 'CONNECTING' ? 'warning' : 'danger'" size="sm">
+                  <Badge :variant="conn.status === 0 || conn.status === 'CONNECTED' ? 'success' : conn.status === 2 || conn.status === 'CONNECTING' ? 'warning' : 'danger'" size="sm" dot>
                     {{ formatConnectorStatus(conn.status) }}
                   </Badge>
                 </td>
                 <td class="px-4 py-3 text-slate-500 dark:text-zinc-400">
-                  {{ conn.status === 0 || conn.status === 'CONNECTED' ? '握手成功 · 数据通道建立' : '等待对端响应或穿透探测中' }}
+                  {{ conn.status === 0 || conn.status === 'CONNECTED' ? '握手成功 · 数据对等通道已建立' : '等待对端响应或打洞探测中' }}
                 </td>
               </tr>
             </tbody>
@@ -131,19 +133,19 @@
       </Card>
 
       <!-- Section 3: Peer Connections & P2P Details -->
-      <Card class="border border-slate-200 dark:border-zinc-800 overflow-hidden">
-        <div class="p-4 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between">
+      <Card class="border-slate-200 dark:border-[#262a33] overflow-hidden">
+        <div class="p-4 border-b border-slate-100 dark:border-[#262a33] flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <Network class="w-4 h-4 text-indigo-500" />
+            <Network class="w-4 h-4 text-[#f38020]" />
             <h3 class="text-sm font-bold text-slate-900 dark:text-zinc-100">活跃 P2P 对等连接与隧道度量 (Peers)</h3>
           </div>
-          <Badge variant="neutral" size="sm">
+          <Badge variant="cf" size="sm">
             {{ peers.length }} 个对端
           </Badge>
         </div>
 
         <div v-if="peersLoading" class="p-8 text-center text-xs text-slate-400">
-          <Loader2 class="w-5 h-5 mx-auto animate-spin mb-2 text-indigo-500" />
+          <Loader2 class="w-5 h-5 mx-auto animate-spin mb-2 text-orange-500" />
           正在探查对端链路...
         </div>
         <div v-else-if="peers.length === 0" class="p-8 text-center text-xs text-slate-400 dark:text-zinc-500">
@@ -151,27 +153,27 @@
         </div>
         <div v-else class="overflow-x-auto">
           <table class="w-full text-left text-xs">
-            <thead class="bg-slate-50 dark:bg-zinc-800/60 text-slate-500 dark:text-zinc-400 border-b border-slate-200 dark:border-zinc-800">
+            <thead class="bg-slate-50 dark:bg-[#191c22] text-slate-500 dark:text-zinc-400 border-b border-slate-200 dark:border-[#262a33]">
               <tr>
-                <th class="px-4 py-2.5 font-medium">Peer ID</th>
-                <th class="px-4 py-2.5 font-medium">隧道类型 (Tunnel)</th>
-                <th class="px-4 py-2.5 font-medium">往返延迟 (RTT)</th>
-                <th class="px-4 py-2.5 font-medium">丢包率</th>
-                <th class="px-4 py-2.5 font-medium">流量统计 (RX / TX)</th>
-                <th class="px-4 py-2.5 font-medium">安全级别</th>
+                <th class="px-4 py-2.5 font-semibold">Peer ID</th>
+                <th class="px-4 py-2.5 font-semibold">隧道类型 (Tunnel)</th>
+                <th class="px-4 py-2.5 font-semibold">往返延迟 (RTT)</th>
+                <th class="px-4 py-2.5 font-semibold">丢包率</th>
+                <th class="px-4 py-2.5 font-semibold">流量统计 (RX / TX)</th>
+                <th class="px-4 py-2.5 font-semibold">安全模式</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100 dark:divide-zinc-800 text-slate-700 dark:text-zinc-300">
+            <tbody class="divide-y divide-slate-100 dark:divide-[#262a33] text-slate-700 dark:text-zinc-300">
               <template v-for="peer in peers" :key="peer.peer_id">
-                <tr v-for="(conn, cIdx) in (peer.conns || [{}])" :key="cIdx" class="hover:bg-slate-50/50 dark:hover:bg-zinc-800/40">
-                  <td class="px-4 py-3 font-mono font-medium text-slate-900 dark:text-zinc-100">
+                <tr v-for="(conn, cIdx) in (peer.conns || [{}])" :key="cIdx" class="hover:bg-slate-50/60 dark:hover:bg-zinc-800/40">
+                  <td class="px-4 py-3 font-mono font-bold text-slate-900 dark:text-zinc-100">
                     #{{ peer.peer_id }}
                   </td>
                   <td class="px-4 py-3 font-mono">
                     <span v-if="conn.tunnel" class="text-slate-800 dark:text-zinc-200">
                       {{ formatTunnel(conn.tunnel) }}
                     </span>
-                    <span v-else class="text-slate-400">中继链路</span>
+                    <span v-else class="text-slate-400">中继转发链路</span>
                   </td>
                   <td class="px-4 py-3 font-mono">
                     <span v-if="conn.stats?.latency_us" :class="getLatencyClass(conn.stats.latency_us)">
@@ -188,7 +190,7 @@
                   <td class="px-4 py-3 font-mono text-[11px]">
                     <span class="text-emerald-600 dark:text-emerald-400">↓ {{ formatBytes(conn.stats?.rx_bytes) }}</span>
                     <span class="mx-1 text-slate-300 dark:text-zinc-700">|</span>
-                    <span class="text-indigo-600 dark:text-indigo-400">↑ {{ formatBytes(conn.stats?.tx_bytes) }}</span>
+                    <span class="text-orange-600 dark:text-orange-400">↑ {{ formatBytes(conn.stats?.tx_bytes) }}</span>
                   </td>
                   <td class="px-4 py-3">
                     <Badge variant="success" size="sm">
@@ -203,8 +205,8 @@
       </Card>
 
       <!-- Section 4: Live Prometheus Metrics Raw Inspector -->
-      <Card class="border border-slate-200 dark:border-zinc-800 overflow-hidden">
-        <div class="p-4 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between">
+      <Card class="border-slate-200 dark:border-[#262a33] overflow-hidden">
+        <div class="p-4 border-b border-slate-100 dark:border-[#262a33] flex items-center justify-between">
           <div class="flex items-center gap-2">
             <BarChart2 class="w-4 h-4 text-purple-500" />
             <h3 class="text-sm font-bold text-slate-900 dark:text-zinc-100">Prometheus 实时性能指标探针</h3>
@@ -217,14 +219,14 @@
 
         <div class="p-4">
           <div v-if="metricsLoading" class="py-8 text-center text-xs text-slate-400">
-            <Loader2 class="w-5 h-5 mx-auto animate-spin mb-2 text-indigo-500" />
+            <Loader2 class="w-5 h-5 mx-auto animate-spin mb-2 text-orange-500" />
             正在采样指标流...
           </div>
           <div v-else-if="!rawMetricsText" class="py-8 text-center text-xs text-slate-400 dark:text-zinc-500">
             暂无 Prometheus 指标上报。
           </div>
           <div v-else class="relative">
-            <pre class="p-4 text-[11px] font-mono rounded-xl bg-slate-950 text-slate-200 max-h-72 overflow-y-auto select-all leading-relaxed">{{ rawMetricsText }}</pre>
+            <pre class="p-4 text-[11px] font-mono rounded bg-slate-950 text-slate-200 max-h-72 overflow-y-auto select-all leading-relaxed">{{ rawMetricsText }}</pre>
             <Button
               variant="secondary"
               size="sm"
@@ -232,7 +234,7 @@
               @click="copyText(rawMetricsText, 'Prometheus 指标')"
             >
               <Copy class="w-3.5 h-3.5 mr-1" />
-              复制指标文本
+              复制
             </Button>
           </div>
         </div>
@@ -244,7 +246,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import {
-  Activity,
+  ActivitySquare,
   ScrollText,
   Radio,
   Network,
@@ -405,14 +407,14 @@ function getProtoBadgeClass(scheme: string): string {
   if (s.includes('wg')) return 'bg-purple-100 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300'
   if (s.includes('udp')) return 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300'
   if (s.includes('tcp')) return 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300'
-  if (s.includes('ws')) return 'bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300'
+  if (s.includes('ws')) return 'bg-orange-100 dark:bg-orange-950/50 text-orange-700 dark:text-orange-300'
   return 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300'
 }
 
 function getLatencyClass(latencyUs: number): string {
   const ms = latencyUs / 1000
   if (ms < 30) return 'text-emerald-500 font-semibold'
-  if (ms < 100) return 'text-amber-500'
+  if (ms < 100) return 'text-orange-500'
   return 'text-rose-500 font-semibold'
 }
 

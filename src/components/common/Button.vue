@@ -1,46 +1,52 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { Loader2 } from 'lucide-vue-next'
 
 const props = withDefaults(
   defineProps<{
-    variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger'
+    variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'outline' | 'cf'
     size?: 'sm' | 'md' | 'lg'
-    disabled?: boolean
     loading?: boolean
+    disabled?: boolean
     type?: 'button' | 'submit' | 'reset'
   }>(),
   {
-    variant: 'primary',
+    variant: 'secondary',
     size: 'md',
-    disabled: false,
     loading: false,
+    disabled: false,
     type: 'button',
   }
 )
 
-const sizeClasses = computed(() => {
+const baseStyles = 'inline-flex items-center justify-center font-medium transition-all duration-150 select-none focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none active:scale-[0.98]'
+
+const sizeStyles = computed(() => {
   switch (props.size) {
     case 'sm':
-      return 'px-2.5 py-1 text-xs rounded-md gap-1.5'
+      return 'text-xs px-2.5 py-1.5 rounded-md gap-1.5'
     case 'lg':
-      return 'px-5 py-2.5 text-base rounded-lg gap-2.5'
+      return 'text-sm px-5 py-2.5 rounded-md gap-2'
     default:
-      return 'px-3.5 py-1.5 text-sm rounded-md gap-2'
+      return 'text-xs px-3.5 py-2 rounded-md gap-2'
   }
 })
 
-const variantClasses = computed(() => {
+const variantStyles = computed(() => {
   switch (props.variant) {
+    case 'primary':
+    case 'cf':
+      return 'bg-[#f38020] hover:bg-[#e55b00] text-white shadow-xs border border-transparent font-semibold'
     case 'secondary':
-      return 'bg-slate-100 text-slate-800 hover:bg-slate-200 border border-slate-200/80 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 dark:border-zinc-700'
+      return 'bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 border border-slate-300 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-700/60 shadow-xs'
     case 'outline':
-      return 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 dark:bg-zinc-900/60 dark:text-zinc-200 dark:border-zinc-700 dark:hover:bg-zinc-800'
-    case 'ghost':
-      return 'bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100'
+      return 'bg-transparent text-slate-700 dark:text-zinc-200 border border-slate-300 dark:border-zinc-700 hover:bg-slate-100 dark:hover:bg-zinc-800'
     case 'danger':
-      return 'bg-rose-600 text-white hover:bg-rose-700 dark:bg-rose-600 dark:hover:bg-rose-500 shadow-sm'
+      return 'bg-rose-600 hover:bg-rose-700 text-white shadow-xs border border-transparent font-medium'
+    case 'ghost':
+      return 'bg-transparent text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800'
     default:
-      return 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-sm shadow-indigo-600/20 active:bg-indigo-700'
+      return 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200'
   }
 })
 </script>
@@ -49,22 +55,9 @@ const variantClasses = computed(() => {
   <button
     :type="type"
     :disabled="disabled || loading"
-    :class="[
-      'inline-flex items-center justify-center font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 select-none disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer',
-      sizeClasses,
-      variantClasses,
-    ]"
+    :class="[baseStyles, sizeStyles, variantStyles]"
   >
-    <svg
-      v-if="loading"
-      class="animate-spin -ml-0.5 h-4 w-4 shrink-0"
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-    >
-      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-    </svg>
+    <Loader2 v-if="loading" class="w-3.5 h-3.5 animate-spin shrink-0" />
     <slot />
   </button>
 </template>

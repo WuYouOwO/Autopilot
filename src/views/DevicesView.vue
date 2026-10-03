@@ -3,74 +3,77 @@
     <!-- Header -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-zinc-100 flex items-center gap-2.5">
-          <Laptop class="w-6 h-6 text-indigo-500" />
-          物理设备与客户端资产
+        <div class="flex items-center gap-2 text-xs font-medium text-orange-600 dark:text-orange-400 mb-1">
+          <Server class="w-3.5 h-3.5" />
+          <span>EDGE COMPUTE NODES</span>
+        </div>
+        <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-zinc-100 flex items-center gap-2">
+          边缘计算节点与物理设备 (Devices)
         </h1>
-        <p class="text-sm text-slate-500 dark:text-zinc-400 mt-1">
-          纳管所有与 EasyTier Web 控制器保持长连接的计算节点。查看终端健康状态、运行实例及实时心跳。
+        <p class="text-xs text-slate-500 dark:text-zinc-400 mt-1">
+          查看已向 EasyTier 边缘网络控制器注册的主机资产、实时心跳状态与挂载的 Mesh 实例。
         </p>
       </div>
 
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2.5">
         <Button variant="secondary" size="sm" :loading="loading" @click="refreshData">
-          <RefreshCw class="w-4 h-4 mr-1.5" />
+          <RefreshCw class="w-3.5 h-3.5 mr-1" />
           刷新列表
         </Button>
         <Button variant="primary" size="sm" @click="showOnboardModal = true">
-          <Plus class="w-4 h-4 mr-1.5" />
+          <Plus class="w-3.5 h-3.5 mr-1" />
           接入新设备
         </Button>
       </div>
     </div>
 
-    <!-- Quick Telemetry Stats Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <Card class="p-4 border border-slate-200 dark:border-zinc-800">
-        <div class="flex items-center justify-between">
-          <span class="text-xs font-medium text-slate-500 dark:text-zinc-400">设备总数</span>
-          <Server class="w-4 h-4 text-slate-400" />
+    <!-- CF Quick Telemetry Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <Card class="p-4 border-slate-200 dark:border-[#262a33]">
+        <div class="flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400 font-medium">
+          <span>注册主机总数</span>
+          <Laptop class="w-4 h-4 text-slate-400" />
         </div>
         <div class="text-2xl font-bold text-slate-900 dark:text-zinc-100 mt-2">
           {{ machines.length }}
         </div>
         <div class="text-[11px] text-slate-400 dark:text-zinc-500 mt-1">
-          已向控制器上报心跳的主机
+          全平台纳管主机硬件
         </div>
       </Card>
 
-      <Card class="p-4 border border-slate-200 dark:border-zinc-800">
-        <div class="flex items-center justify-between">
-          <span class="text-xs font-medium text-slate-500 dark:text-zinc-400">在线活跃</span>
+      <Card class="p-4 border-slate-200 dark:border-[#262a33]">
+        <div class="flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400 font-medium">
+          <span>在线活跃节点</span>
           <Activity class="w-4 h-4 text-emerald-500" />
         </div>
         <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-2">
           {{ onlineCount }}
         </div>
         <div class="text-[11px] text-emerald-600/80 dark:text-emerald-400/80 mt-1">
-          最近 3 分钟内保持通讯
+          3 分钟内心跳响应正常
         </div>
       </Card>
 
-      <Card class="p-4 border border-slate-200 dark:border-zinc-800">
-        <div class="flex items-center justify-between">
-          <span class="text-xs font-medium text-slate-500 dark:text-zinc-400">运行网络实例</span>
-          <Globe class="w-4 h-4 text-indigo-500" />
+      <Card class="p-4 border-slate-200 dark:border-[#262a33]">
+        <div class="flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400 font-medium">
+          <span>运行 Mesh 实例</span>
+          <Globe class="w-4 h-4 text-[#f38020]" />
         </div>
-        <div class="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-2">
+        <div class="text-2xl font-bold text-orange-600 dark:text-orange-400 mt-2">
           {{ totalRunningInstances }}
         </div>
         <div class="text-[11px] text-slate-400 dark:text-zinc-500 mt-1">
-          全网活跃 Mesh 虚拟网卡
+          活跃虚拟隧道网卡
         </div>
       </Card>
 
-      <Card class="p-4 border border-slate-200 dark:border-zinc-800">
-        <div class="flex items-center justify-between">
-          <span class="text-xs font-medium text-slate-500 dark:text-zinc-400">跨平台架构</span>
-          <Cpu class="w-4 h-4 text-amber-500" />
+      <Card class="p-4 border-slate-200 dark:border-[#262a33]">
+        <div class="flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400 font-medium">
+          <span>跨平台支持</span>
+          <Cpu class="w-4 h-4 text-blue-500" />
         </div>
-        <div class="text-sm font-semibold text-slate-800 dark:text-zinc-200 mt-2 flex items-center gap-2">
+        <div class="text-xs font-bold text-slate-800 dark:text-zinc-200 mt-3 flex items-center gap-2">
           <span>Linux: {{ osCounts.linux }}</span>
           <span>·</span>
           <span>Win: {{ osCounts.windows }}</span>
@@ -78,7 +81,7 @@
           <span>Mac: {{ osCounts.darwin }}</span>
         </div>
         <div class="text-[11px] text-slate-400 dark:text-zinc-500 mt-1">
-          多系统混合全网状互通
+          多系统端到端对等穿透
         </div>
       </Card>
     </div>
@@ -86,12 +89,12 @@
     <!-- Filter & Search Bar -->
     <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
       <div class="relative w-full sm:w-80">
-        <Search class="w-4 h-4 absolute left-3 top-2.5 text-slate-400 dark:text-zinc-500" />
+        <Search class="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
         <input
           v-model="searchQuery"
           type="text"
-          placeholder="搜索主机名、设备 ID、操作系统..."
-          class="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          placeholder="搜索主机名、设备 ID、系统..."
+          class="w-full pl-8 pr-3 py-1.5 text-xs rounded border border-slate-200 dark:border-[#262a33] bg-white dark:bg-[#191c22] text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-orange-500"
         />
       </div>
 
@@ -99,7 +102,7 @@
         <span class="text-xs text-slate-500 dark:text-zinc-400">系统筛选:</span>
         <select
           v-model="osFilter"
-          class="px-2.5 py-1 text-xs rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          class="px-2.5 py-1 text-xs rounded border border-slate-200 dark:border-[#262a33] bg-white dark:bg-[#191c22] text-slate-700 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-orange-500"
         >
           <option value="all">全部操作系统</option>
           <option value="linux">Linux</option>
@@ -110,137 +113,131 @@
       </div>
     </div>
 
-    <!-- Machines Grid / List -->
-    <div v-if="loading && machines.length === 0" class="py-16 text-center text-slate-400 dark:text-zinc-500 text-sm">
-      <Loader2 class="w-7 h-7 mx-auto animate-spin mb-3 text-indigo-500" />
-      正在拉取节点设备清单...
-    </div>
+    <!-- Devices Table -->
+    <Card class="border-slate-200 dark:border-[#262a33] overflow-hidden">
+      <div v-if="loading && machines.length === 0" class="py-16 text-center text-xs text-slate-400">
+        <Loader2 class="w-6 h-6 mx-auto animate-spin mb-2 text-orange-500" />
+        正在拉取主机资产清册...
+      </div>
 
-    <div v-else-if="filteredMachines.length === 0" class="py-16 text-center border border-dashed border-slate-200 dark:border-zinc-800 rounded-2xl bg-white/50 dark:bg-zinc-900/50">
-      <Laptop class="w-12 h-12 mx-auto text-slate-300 dark:text-zinc-600 mb-3" />
-      <h3 class="text-sm font-semibold text-slate-700 dark:text-zinc-200">未检索到匹配的物理设备</h3>
-      <p class="text-xs text-slate-500 dark:text-zinc-400 mt-1 max-w-sm mx-auto">
-        当前暂无设备连接或过滤条件无结果。您可以在服务器或个人终端运行命令加入本中心。
-      </p>
-      <Button variant="primary" size="sm" class="mt-4" @click="showOnboardModal = true">
-        <Plus class="w-4 h-4 mr-1.5" />
-        查看设备接入指引
-      </Button>
-    </div>
+      <div v-else-if="filteredMachines.length === 0" class="py-16 text-center border border-dashed border-slate-200 dark:border-zinc-800 rounded bg-white/50 dark:bg-zinc-900/40">
+        <Server class="w-10 h-10 mx-auto text-slate-300 dark:text-zinc-600 mb-2" />
+        <h3 class="text-sm font-semibold text-slate-800 dark:text-zinc-200">未检索到匹配的边缘设备</h3>
+        <p class="text-xs text-slate-500 dark:text-zinc-400 mt-1 max-w-sm mx-auto">
+          当前暂无设备连接或过滤条件无结果。您可以在任何终端运行接入命令。
+        </p>
+        <Button variant="primary" size="sm" class="mt-4" @click="showOnboardModal = true">
+          <Plus class="w-3.5 h-3.5 mr-1" />
+          查看接入指引
+        </Button>
+      </div>
 
-    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      <Card
-        v-for="m in filteredMachines"
-        :key="m.machine_id"
-        class="border border-slate-200 dark:border-zinc-800 hover:shadow-md transition-shadow relative overflow-hidden"
-      >
-        <div class="p-4 space-y-3.5">
-          <!-- Top Row: Hostname, OS Badge & Online Status -->
-          <div class="flex items-start justify-between gap-2">
-            <div class="flex items-center gap-2.5 min-w-0">
-              <div class="w-9 h-9 rounded-xl bg-slate-100 dark:bg-zinc-800 flex items-center justify-center shrink-0 border border-slate-200/60 dark:border-zinc-700">
-                <Terminal v-if="m.os_name?.toLowerCase().includes('linux')" class="w-5 h-5 text-amber-500" />
-                <Laptop v-else-if="m.os_name?.toLowerCase().includes('darwin')" class="w-5 h-5 text-indigo-500" />
-                <Monitor v-else-if="m.os_name?.toLowerCase().includes('windows')" class="w-5 h-5 text-blue-500" />
-                <Server v-else class="w-5 h-5 text-slate-500" />
-              </div>
+      <div v-else class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-50 dark:bg-[#191c22] text-slate-500 dark:text-zinc-400 border-b border-slate-200 dark:border-[#262a33]">
+            <tr>
+              <th class="px-4 py-3 font-semibold">主机名 / 节点标识</th>
+              <th class="px-4 py-3 font-semibold">操作系统平台</th>
+              <th class="px-4 py-3 font-semibold">EasyTier 引擎</th>
+              <th class="px-4 py-3 font-semibold">心跳状态</th>
+              <th class="px-4 py-3 font-semibold">运行实例</th>
+              <th class="px-4 py-3 font-semibold">物理出口</th>
+              <th class="px-4 py-3 font-semibold text-right">操作</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 dark:divide-[#262a33] text-slate-700 dark:text-zinc-300">
+            <tr v-for="m in filteredMachines" :key="m.machine_id" class="hover:bg-slate-50/60 dark:hover:bg-zinc-800/40 transition-colors">
+              <!-- Hostname & UUID -->
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-2">
+                  <div class="w-7 h-7 rounded bg-slate-100 dark:bg-zinc-800 flex items-center justify-center shrink-0 border border-slate-200/60 dark:border-zinc-700">
+                    <Terminal v-if="m.os_name?.toLowerCase().includes('linux')" class="w-4 h-4 text-orange-500" />
+                    <Laptop v-else-if="m.os_name?.toLowerCase().includes('darwin')" class="w-4 h-4 text-blue-500" />
+                    <Monitor v-else-if="m.os_name?.toLowerCase().includes('windows')" class="w-4 h-4 text-sky-500" />
+                    <Server v-else class="w-4 h-4 text-slate-500" />
+                  </div>
 
-              <div class="min-w-0">
-                <div class="flex items-center gap-1.5">
-                  <h3 class="font-bold text-sm text-slate-900 dark:text-zinc-100 truncate" :title="m.hostname">
-                    {{ m.hostname || '未命名设备' }}
-                  </h3>
+                  <div class="min-w-0">
+                    <div class="font-bold text-slate-900 dark:text-zinc-100 truncate">
+                      {{ m.hostname }}
+                    </div>
+                    <div class="text-[10px] text-slate-400 font-mono truncate flex items-center gap-1">
+                      <span>{{ m.machine_id.slice(0, 12) }}...</span>
+                      <button @click="copyText(m.machine_id, '设备 UUID')" class="hover:text-slate-600 dark:hover:text-zinc-200">
+                        <Copy class="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div class="text-[11px] text-slate-400 dark:text-zinc-500 truncate flex items-center gap-1 font-mono">
-                  <span>{{ m.machine_id.slice(0, 12) }}...</span>
-                  <button @click="copyText(m.machine_id, '设备 UUID')" class="hover:text-slate-600 dark:hover:text-zinc-300" title="复制完整 UUID">
-                    <Copy class="w-3 h-3" />
-                  </button>
-                </div>
-              </div>
-            </div>
+              </td>
 
-            <Badge :variant="isOnline(m.report_time) ? 'success' : 'neutral'" size="sm">
-              <span class="w-1.5 h-1.5 rounded-full mr-1" :class="isOnline(m.report_time) ? 'bg-emerald-500' : 'bg-slate-400'"></span>
-              {{ isOnline(m.report_time) ? '在线' : '离线' }}
-            </Badge>
-          </div>
-
-          <!-- Spec Details -->
-          <div class="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-slate-100 dark:border-zinc-800">
-            <div>
-              <span class="text-slate-400 dark:text-zinc-500 block text-[10px]">系统版本</span>
-              <span class="font-medium text-slate-700 dark:text-zinc-300 truncate block" :title="m.os_name">
+              <!-- OS Platform -->
+              <td class="px-4 py-3 text-slate-700 dark:text-zinc-300">
                 {{ m.os_name || 'Linux' }}
-              </span>
-            </div>
-            <div>
-              <span class="text-slate-400 dark:text-zinc-500 block text-[10px]">EasyTier 版本</span>
-              <span class="font-mono font-medium text-slate-700 dark:text-zinc-300">
-                {{ m.version || 'v2.6.x' }}
-              </span>
-            </div>
-            <div>
-              <span class="text-slate-400 dark:text-zinc-500 block text-[10px]">地理位置 / 出口</span>
-              <span class="font-medium text-slate-700 dark:text-zinc-300 truncate block">
+              </td>
+
+              <!-- Engine Version -->
+              <td class="px-4 py-3 font-mono text-[11px] text-slate-600 dark:text-zinc-400">
+                {{ m.version || 'v2.6.4' }}
+              </td>
+
+              <!-- Heartbeat Status -->
+              <td class="px-4 py-3">
+                <Badge :variant="isOnline(m.report_time) ? 'success' : 'neutral'" size="sm" dot>
+                  {{ isOnline(m.report_time) ? '在线 (Active)' : '离线' }}
+                </Badge>
+                <span class="text-[10px] text-slate-400 ml-1.5 font-mono">
+                  {{ formatReportTime(m.report_time) }}
+                </span>
+              </td>
+
+              <!-- Hosted Instances -->
+              <td class="px-4 py-3">
+                <div v-if="(m.running_instances || []).length > 0" class="flex flex-wrap gap-1">
+                  <span
+                    v-for="instId in m.running_instances"
+                    :key="instId"
+                    class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 border border-orange-200/60 dark:border-orange-800/40"
+                  >
+                    {{ instId.slice(0, 8) }}
+                  </span>
+                </div>
+                <span v-else class="text-[11px] text-slate-400 italic">未挂载</span>
+              </td>
+
+              <!-- Physical Location -->
+              <td class="px-4 py-3 text-slate-500 dark:text-zinc-400 text-[11px]">
                 {{ formatLocation(m.location) }}
-              </span>
-            </div>
-            <div>
-              <span class="text-slate-400 dark:text-zinc-500 block text-[10px]">最近心跳</span>
-              <span class="font-medium text-slate-700 dark:text-zinc-300" :title="String(m.report_time || '')">
-                {{ formatReportTime(m.report_time) }}
-              </span>
-            </div>
-          </div>
+              </td>
 
-          <!-- Networks Hosted on this Machine -->
-          <div class="pt-2 border-t border-slate-100 dark:border-zinc-800">
-            <div class="text-[11px] font-medium text-slate-500 dark:text-zinc-400 mb-1.5 flex items-center justify-between">
-              <span>运行中网络实例 ({{ (m.running_instances || []).length }})</span>
-            </div>
-            <div v-if="(m.running_instances || []).length > 0" class="flex flex-wrap gap-1.5">
-              <span
-                v-for="instId in m.running_instances"
-                :key="instId"
-                class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-800/40"
-              >
-                <Network class="w-3 h-3 text-indigo-500" />
-                {{ instId.slice(0, 8) }}
-              </span>
-            </div>
-            <div v-else class="text-[11px] text-slate-400 dark:text-zinc-500 italic">
-              当前尚未挂载 Mesh 网络实例
-            </div>
-          </div>
+              <!-- Actions -->
+              <td class="px-4 py-3 text-right">
+                <div class="flex items-center justify-end gap-3">
+                  <router-link
+                    :to="{ path: '/diagnostics', query: { machine_id: m.machine_id } }"
+                    class="text-xs text-orange-600 dark:text-orange-400 hover:text-orange-700 font-medium"
+                  >
+                    探针诊断
+                  </router-link>
+                  <router-link
+                    :to="{ path: '/credentials', query: { machine_id: m.machine_id } }"
+                    class="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-zinc-200"
+                  >
+                    凭证
+                  </router-link>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </Card>
 
-          <!-- Card Actions -->
-          <div class="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-zinc-800">
-            <router-link
-              :to="{ path: '/diagnostics', query: { machine_id: m.machine_id } }"
-              class="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 flex items-center gap-1"
-            >
-              <Activity class="w-3.5 h-3.5" />
-              诊断体检
-            </router-link>
-
-            <router-link
-              :to="{ path: '/credentials', query: { machine_id: m.machine_id } }"
-              class="text-xs font-medium text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 flex items-center gap-1"
-            >
-              <Key class="w-3.5 h-3.5" />
-              管理凭证
-            </router-link>
-          </div>
-        </div>
-      </Card>
-    </div>
-
-    <!-- Onboarding Guide Modal -->
-    <Dialog :open="showOnboardModal" title="接入新计算设备至 EasyTier 控制器" @close="showOnboardModal = false">
+    <!-- Onboarding Modal -->
+    <Dialog :open="showOnboardModal" title="接入新计算设备至 EasyTier 控制台" @close="showOnboardModal = false">
       <div class="space-y-4 text-xs">
         <p class="text-slate-600 dark:text-zinc-400 leading-relaxed">
-          将 EasyTier 客户端配置为连接至此控制器的配置分发端口（默认端口 <code class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-zinc-800 text-indigo-600 font-mono">22020</code>），即可自动纳管该设备并在本看板中监控与下发配置。
+          将 EasyTier 客户端配置连接至此控制器的配置分发端口（默认端口 <code class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-zinc-800 text-orange-600 font-mono">22020</code>），即可自动纳管该设备并在本看板中监控与下发配置。
         </p>
 
         <div>
@@ -248,7 +245,7 @@
             方式一：Linux / macOS CLI 快速启动 (命令行)
           </label>
           <div class="relative">
-            <pre class="p-3 text-[11px] font-mono rounded-lg bg-slate-900 text-emerald-400 overflow-x-auto whitespace-pre-wrap select-all">{{ cliConnectCommand }}</pre>
+            <pre class="p-3 text-[11px] font-mono rounded bg-slate-950 text-emerald-400 overflow-x-auto whitespace-pre-wrap select-all">{{ cliConnectCommand }}</pre>
             <Button
               variant="secondary"
               size="sm"
@@ -266,7 +263,7 @@
             方式二：Docker 容器化部署
           </label>
           <div class="relative">
-            <pre class="p-3 text-[11px] font-mono rounded-lg bg-slate-900 text-sky-400 overflow-x-auto whitespace-pre-wrap select-all">{{ dockerConnectCommand }}</pre>
+            <pre class="p-3 text-[11px] font-mono rounded bg-slate-950 text-sky-400 overflow-x-auto whitespace-pre-wrap select-all">{{ dockerConnectCommand }}</pre>
             <Button
               variant="secondary"
               size="sm"
@@ -277,15 +274,6 @@
               复制
             </Button>
           </div>
-        </div>
-
-        <div>
-          <label class="block font-semibold text-slate-800 dark:text-zinc-200 mb-1">
-            方式三：配置文件 (easytier.toml)
-          </label>
-          <pre class="p-3 text-[11px] font-mono rounded-lg bg-slate-100 dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 overflow-x-auto whitespace-pre-wrap select-all"># 启用远程受控配置源
-[instance]
-config_server = "{{ configServerUrl }}"</pre>
         </div>
       </div>
 
@@ -299,10 +287,10 @@ config_server = "{{ configServerUrl }}"</pre>
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import {
+  Server,
   Laptop,
   Terminal,
   Monitor,
-  Server,
   Activity,
   Globe,
   Cpu,
@@ -310,8 +298,6 @@ import {
   Plus,
   Search,
   Copy,
-  Network,
-  Key,
   Loader2,
 } from 'lucide-vue-next'
 import Button from '@/components/common/Button.vue'
@@ -369,15 +355,15 @@ const filteredMachines = computed(() => {
 
 const configServerUrl = computed(() => {
   const host = window.location.hostname || '127.0.0.1'
-  return `http://${host}:22020`
+  return `udp://${host}:22020/admin`
 })
 
 const cliConnectCommand = computed(() => {
-  return `easytier-core --config-server "${configServerUrl.value}"`
+  return `easytier-core -w "${configServerUrl.value}"`
 })
 
 const dockerConnectCommand = computed(() => {
-  return `docker run -d --name easytier-client --net=host --cap-add=NET_ADMIN --device=/dev/net/tun easytier/easytier:latest easytier-core --config-server "${configServerUrl.value}"`
+  return `docker run -d --name easytier-client --net=host --cap-add=NET_ADMIN --device=/dev/net/tun easytier/easytier:latest easytier-core -w "${configServerUrl.value}"`
 })
 
 onMounted(async () => {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { VueFlow, useVueFlow } from '@vue-flow/core'
+import { VueFlow } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import '@vue-flow/core/dist/style.css'
@@ -9,7 +9,7 @@ import '@vue-flow/controls/dist/style.css'
 import { useTheme } from '@/composables/useTheme'
 import { MeshNode } from '@/stores/network'
 import Badge from '@/components/common/Badge.vue'
-import { Monitor, Smartphone, Server, Laptop, Wifi } from 'lucide-vue-next'
+import { Server } from 'lucide-vue-next'
 
 const props = defineProps<{
   nodes: MeshNode[]
@@ -75,7 +75,7 @@ const flowElements = computed(() => {
 </script>
 
 <template>
-  <div class="w-full h-[460px] rounded-2xl overflow-hidden border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 relative shadow-inner">
+  <div class="w-full h-[480px] rounded-md overflow-hidden border border-slate-200 dark:border-[#262a33] bg-slate-50/50 dark:bg-[#101216] relative shadow-inner">
     <VueFlow
       :elements="flowElements"
       :default-viewport="{ zoom: 0.95, x: 20, y: 10 }"
@@ -83,13 +83,13 @@ const flowElements = computed(() => {
       :max-zoom="2"
       fit-view-on-init
     >
-      <Background :pattern-color="isDark ? '#27272a' : '#e2e8f0'" :gap="20" />
+      <Background :pattern-color="isDark ? '#262a33' : '#e2e5ea'" :gap="20" />
       <Controls position="bottom-right" />
 
-      <!-- 自定义节点微卡片 -->
+      <!-- 自定义节点微卡片 (Cloudflare Edge Node) -->
       <template #node-customNode="{ data }">
         <div
-          class="px-4 py-3 rounded-xl bg-white dark:bg-zinc-900 border-2 transition-all shadow-md dark:shadow-none min-w-[200px]"
+          class="px-3.5 py-2.5 rounded-md bg-white dark:bg-[#191c22] border-2 transition-all shadow-xs min-w-[190px]"
           :class="[
             data.status === 'online'
               ? 'border-emerald-500/80 shadow-emerald-500/10'
@@ -98,29 +98,29 @@ const flowElements = computed(() => {
               : 'border-slate-300 dark:border-zinc-700'
           ]"
         >
-          <div class="flex items-center justify-between gap-3 mb-2">
-            <div class="flex items-center gap-2">
-              <div class="p-1 rounded bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300">
-                <Server class="w-4 h-4" />
+          <div class="flex items-center justify-between gap-2.5 mb-1.5">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <div class="p-1 rounded bg-orange-50 dark:bg-orange-950/40 text-[#f38020]">
+                <Server class="w-3.5 h-3.5" />
               </div>
-              <span class="font-semibold text-xs text-slate-900 dark:text-zinc-100 truncate max-w-[100px]" :title="data.hostname">
+              <span class="font-bold text-xs text-slate-900 dark:text-zinc-100 truncate max-w-[90px]" :title="data.hostname">
                 {{ data.hostname }}
               </span>
             </div>
-            <Badge :variant="data.status" :pulse="data.status === 'online'">
-              {{ data.status === 'online' ? 'P2P直连' : data.status === 'relay' ? '中继' : '离线' }}
+            <Badge :variant="data.status" :pulse="data.status === 'online'" size="sm">
+              {{ data.status === 'online' ? '直连' : data.status === 'relay' ? '中继' : '离线' }}
             </Badge>
           </div>
 
           <!-- 双栈 IP 地址 -->
-          <div class="space-y-1 font-mono text-[11px] text-slate-500 dark:text-zinc-400">
+          <div class="space-y-0.5 font-mono text-[10px] text-slate-500 dark:text-zinc-400">
             <div v-if="data.virtualIpv4" class="flex items-center justify-between">
-              <span class="text-[10px] text-slate-400">IPv4</span>
+              <span class="text-slate-400">IPv4</span>
               <span class="font-medium text-slate-800 dark:text-zinc-200">{{ data.virtualIpv4 }}</span>
             </div>
             <div v-if="data.virtualIpv6" class="flex items-center justify-between">
-              <span class="text-[10px] text-slate-400">IPv6</span>
-              <span class="font-medium text-indigo-600 dark:text-indigo-400 truncate max-w-[130px]" :title="data.virtualIpv6">
+              <span class="text-slate-400">IPv6</span>
+              <span class="font-medium text-orange-600 dark:text-orange-400 truncate max-w-[120px]" :title="data.virtualIpv6">
                 {{ data.virtualIpv6 }}
               </span>
             </div>
@@ -130,15 +130,15 @@ const flowElements = computed(() => {
     </VueFlow>
 
     <!-- 拓扑图例 -->
-    <div class="absolute top-3 left-3 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm border border-slate-200 dark:border-zinc-800 rounded-lg p-2.5 text-xs space-y-1.5 shadow-sm select-none pointer-events-none">
-      <div class="font-semibold text-slate-800 dark:text-zinc-200 text-[11px]">全景链路状态</div>
-      <div class="flex items-center gap-2 text-slate-600 dark:text-zinc-400">
+    <div class="absolute top-3 left-3 bg-white/95 dark:bg-[#191c22]/95 backdrop-blur-sm border border-slate-200 dark:border-[#262a33] rounded p-2 text-xs space-y-1 shadow-xs select-none pointer-events-none">
+      <div class="font-bold text-slate-800 dark:text-zinc-200 text-[11px]">链路状态</div>
+      <div class="flex items-center gap-2 text-slate-600 dark:text-zinc-400 text-[10px]">
         <span class="w-3 h-0.5 bg-emerald-500"></span>
-        <span>P2P 超低延迟直连</span>
+        <span>P2P 超低延迟直连 (Direct)</span>
       </div>
-      <div class="flex items-center gap-2 text-slate-600 dark:text-zinc-400">
+      <div class="flex items-center gap-2 text-slate-600 dark:text-zinc-400 text-[10px]">
         <span class="w-3 h-0.5 border-t-2 border-dashed border-amber-500"></span>
-        <span>Relay 公网转发</span>
+        <span>Relay 公网转发 (Proxied)</span>
       </div>
     </div>
   </div>
