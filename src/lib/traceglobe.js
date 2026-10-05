@@ -610,12 +610,13 @@ export function createTraceGlobe(canvas, opts = {}) {
     const p = projXYZ(a.vx * s0 + b.vx * s1, a.vy * s0 + b.vy * s1, a.vz * s0 + b.vz * s1, null, null, LIFT)
     return { sx: p.sx, sy: p.sy, vz: p.z }
   }
-  function drawArc(a, b, rgb, grow, alpha, width) {
+  function drawArc(a, b, rgb, grow, alpha, width, isDashed = false) {
     let dot = clamp(a.vx * b.vx + a.vy * b.vy + a.vz * b.vz, -1, 1)
     const om = Math.acos(dot); if (om < 1e-4) return   // 两端重合: 零长弧, 无可画(否则画到屏幕中心)
     const so = Math.sin(om)
     const steps = Math.max(2, Math.min(40, Math.round(om / .09)))
     ctx.strokeStyle = `rgba(${rgb},${alpha})`; ctx.lineWidth = width; ctx.lineJoin = 'round'; ctx.lineCap = 'round'
+    if (isDashed) ctx.setLineDash([5, 4])
     ctx.beginPath(); let pen = false, pwx = 0
     for (let i = 0; i <= steps; i++) {
       const t = (i / steps) * grow, s0 = Math.sin((1 - t) * om) / so, s1 = Math.sin(t * om) / so
@@ -627,6 +628,7 @@ export function createTraceGlobe(canvas, opts = {}) {
       else { ctx.moveTo(p.sx, p.sy); pen = true }
     }
     ctx.stroke()
+    if (isDashed) ctx.setLineDash([])
   }
 
   // ── 地球本体(暗=夜地球+大气; 亮=抽象玻璃球)── 陆地交给粒子层, 这里只画 chrome + 经纬网 ──
@@ -989,14 +991,15 @@ export function createTraceGlobe(canvas, opts = {}) {
       const nodes = p._nodes; if (!nodes) continue
       const act = !dimAll || activeProbe === p.id
       const baseA = act ? 1 : .14
+      const isRelay = p.isRelay || p.network?.includes('中继') || p.network?.includes('Relay')
       for (let i = 0; i < p.hops.length; i++) {
         const g = p.segGrow[i]; if (g <= .001) continue
         const a = nodes[i], b = nodes[i + 1]
         const za = (projectLL(a.la, a.lo).z + projectLL(b.la, b.lo).z) / 2
         const depth = clamp(za * .5 + .5, 0, 1)
-        // 底层稍粗的辉光 + 上层亮线
-        drawArc(a, b, p.rgb, g, (.10 + depth * .12) * baseA, (act ? 5.5 : 3) * (.5 + depth * .5))
-        drawArc(a, b, p.rgb, g, (.5 + depth * .4) * baseA, (act ? 1.7 : 1) * (.7 + depth * .5))
+        // 底层稍粗的辉光 + 上层亮线 (中继连接呈现虚线质感，直连呈现纯净实线)
+        drawArc(a, b, p.rgb, g, (.10 + depth * .12) * baseA, (act ? 5.5 : 3) * (.5 + depth * .5), false)
+        drawArc(a, b, p.rgb, g, (.5 + depth * .4) * baseA, (act ? 1.7 : 1) * (.7 + depth * .5), isRelay)
         // 生长中的弧头亮点
         if (g < .999 && i === p._frontier) {
           const tip = arcPoint(a, b, g)

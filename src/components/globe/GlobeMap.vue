@@ -85,30 +85,38 @@ const syncData = () => {
   const probes = showLines.value
     ? props.devices
         .filter((d) => d.id !== hub.id)
-        .map((d) => ({
-          id: d.id,
-          city: d.locationName,
-          cc: d.countryCode,
-          asn: 0,
-          network: d.connection,
-          lat: d.lat,
-          lon: d.lng,
-          // 直连使用清亮天蓝 [18, 137, 249]，中继使用琥珀金橙 [245, 166, 35] (完全契合 peer.as)
-          color: d.connection.includes('直连') ? [18, 137, 249] : [245, 166, 35],
-          status: d.status === 'online' ? 'done' : 'queued',
-          hops: [
-            {
-              idx: 1,
-              lat: hub.lat,
-              lon: hub.lng,
-              ip: hub.ipv4,
-              name: hub.hostname,
-              city: hub.locationName,
-              rtt: d.latencyMs,
-              isTarget: true,
-            },
-          ],
-        }))
+        .map((d) => {
+          const isDirect = d.connection.includes('直连')
+          return {
+            id: d.id,
+            city: d.locationName,
+            cc: d.countryCode,
+            asn: 0,
+            network: d.connection,
+            isRelay: !isDirect,
+            lat: d.lat,
+            lon: d.lng,
+            // 用户明确需求：替换成淡绿色/淡蓝色 前者直连后者中继
+            // 前者（直连 P2P）: 淡绿色 [16, 185, 129] / 暗色 [52, 211, 153]
+            // 后者（中继 Relay）: 淡蓝色 [14, 165, 233] / 暗色 [56, 189, 248]
+            color: isDirect
+              ? (props.isDark ? [52, 211, 153] : [16, 185, 129])
+              : (props.isDark ? [56, 189, 248] : [14, 165, 233]),
+            status: d.status === 'online' ? 'done' : 'queued',
+            hops: [
+              {
+                idx: 1,
+                lat: hub.lat,
+                lon: hub.lng,
+                ip: hub.ipv4,
+                name: hub.hostname,
+                city: hub.locationName,
+                rtt: d.latencyMs,
+                isTarget: true,
+              },
+            ],
+          }
+        })
     : []
 
   const model = {
@@ -405,6 +413,18 @@ defineExpose({
             >
               <RotateCw class="w-3.5 h-3.5" />
             </button>
+          </div>
+        </div>
+
+        <!-- 链路图例徽章说明: 淡绿直连 / 淡蓝中继 -->
+        <div class="flex items-center gap-3 pt-0.5 text-[11px]">
+          <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-semibold text-[10px]">
+            <span class="w-2 h-0.5 bg-emerald-500 rounded-full"></span>
+            <span>直连 P2P (淡绿)</span>
+          </div>
+          <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 font-semibold text-[10px]">
+            <span class="w-2 h-0.5 bg-sky-500 rounded-full border-t border-dashed"></span>
+            <span>中继 Relay (淡蓝)</span>
           </div>
         </div>
 

@@ -418,8 +418,8 @@ onUnmounted(() => {
               <span class="w-2.5 h-0.5 bg-emerald-500 rounded-full"></span>
               <span>实线 P2P</span>
             </div>
-            <div class="inline-flex items-center gap-1.5 px-2.5 py-0.8 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300">
-              <span class="w-2.5 h-0.5 bg-amber-500 rounded-full border-t border-dashed"></span>
+            <div class="inline-flex items-center gap-1.5 px-2.5 py-0.8 rounded-full text-xs font-semibold bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300">
+              <span class="w-2.5 h-0.5 bg-sky-500 rounded-full border-t border-dashed"></span>
               <span>虚线 Relay</span>
             </div>
           </div>
@@ -505,11 +505,11 @@ onUnmounted(() => {
           <!-- SVG 连线层 -->
           <svg class="absolute top-0 left-0 w-[2000px] h-[2000px] pointer-events-none overflow-visible">
             <g v-for="link in topologyLinks" :key="link.id">
-              <!-- 基础连线：P2P 为翡翠绿实线，Relay 为琥珀色虚线 -->
+              <!-- 基础连线：P2P 为翡翠淡绿实线，Relay 为清透淡蓝虚线 (前者直连后者中继) -->
               <path
                 :d="calculatePath(link).path"
                 fill="none"
-                :stroke="link.mode === 'p2p' ? '#10b981' : '#f59e0b'"
+                :stroke="link.mode === 'p2p' ? '#10b981' : '#0ea5e9'"
                 :stroke-dasharray="link.mode === 'p2p' ? 'none' : '6,4'"
                 stroke-width="2"
                 stroke-linecap="round"
@@ -524,8 +524,8 @@ onUnmounted(() => {
                   width="76"
                   height="20"
                   rx="10"
-                  :fill="link.mode === 'p2p' ? '#ecfdf5' : '#fffbeb'"
-                  :stroke="link.mode === 'p2p' ? '#a7f3d0' : '#fde68a'"
+                  :fill="link.mode === 'p2p' ? '#ecfdf5' : '#f0f9ff'"
+                  :stroke="link.mode === 'p2p' ? '#a7f3d0' : '#bae6fd'"
                   stroke-width="1"
                 />
                 <text
@@ -535,7 +535,7 @@ onUnmounted(() => {
                   font-size="9"
                   font-family="monospace"
                   font-weight="600"
-                  :fill="link.mode === 'p2p' ? '#047857' : '#b45309'"
+                  :fill="link.mode === 'p2p' ? '#047857' : '#0369a1'"
                 >
                   {{ link.protocol }} · {{ link.latency }}
                 </text>
