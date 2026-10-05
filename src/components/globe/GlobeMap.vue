@@ -12,6 +12,8 @@ import {
   EyeOff,
   Crosshair,
   Server,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-vue-next'
 
 export interface GlobeDevice {
@@ -56,6 +58,7 @@ const searchTarget = ref('')
 const selectedDevice = ref<GlobeDevice | null>(null)
 const isTracing = ref(false)
 const hoveredProbeId = ref<string | null>(null)
+const isRightPanelMinimized = ref(false)
 
 // DOM 引用
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -352,12 +355,26 @@ defineExpose({
       </transition>
     </div>
 
-    <!-- 2. 右上角探测与链路卡片 (完美还原 peer.as/trace 右上角指挥台卡片) -->
+    <!-- 2. 右上角探测与链路卡片 (带收起/展开功能，避免遮挡地球) -->
     <div class="absolute top-4 right-4 z-20 max-w-sm w-full sm:w-auto">
-      <div class="bg-white/95 dark:bg-gray-900/95 backdrop-blur-md rounded-xl border border-gray-200 dark:border-gray-800 shadow-md p-3 space-y-2.5">
-        
-        <!-- 卡片顶部小拉手装饰条 -->
-        <div class="w-8 h-1 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto -mt-1 opacity-60"></div>
+      <!-- 展开状态 -->
+      <div
+        v-if="!isRightPanelMinimized"
+        class="bg-white/95 dark:bg-gray-900/95 backdrop-blur-md rounded-xl border border-gray-200 dark:border-gray-800 shadow-md p-3 space-y-2.5 transition-all"
+      >
+        <!-- 顶部小拉手与收起按钮 -->
+        <div class="flex items-center justify-between pb-0.5">
+          <div class="w-8 h-1 bg-gray-300 dark:bg-gray-700 rounded-full opacity-60"></div>
+          <button
+            type="button"
+            @click="isRightPanelMinimized = true"
+            class="p-1 rounded text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer text-[10px] flex items-center gap-1"
+            title="收起控制面板以全屏查看地球仪"
+          >
+            <span>收起面板</span>
+            <ChevronUp class="w-3 h-3" />
+          </button>
+        </div>
 
         <!-- 目标 IP / 域名探测输入栏 (类似 peer.as/trace 第一行) -->
         <div class="flex items-center gap-1.5">
@@ -434,7 +451,23 @@ defineExpose({
             <span>中继 Relay (淡蓝)</span>
           </div>
         </div>
+      </div>
 
+      <!-- 收起状态 (悬浮胶囊) -->
+      <div
+        v-else
+        class="flex items-center gap-2 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md rounded-full border border-gray-200 dark:border-gray-800 shadow-md px-3.5 py-1.5 text-xs select-none"
+      >
+        <Wifi class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+        <span class="font-medium text-gray-700 dark:text-gray-300 text-[11px]">{{ devices.length }} 节点在线</span>
+        <button
+          type="button"
+          @click="isRightPanelMinimized = false"
+          class="text-blue-600 dark:text-blue-400 hover:underline text-[11px] font-semibold flex items-center gap-0.5 ml-1 cursor-pointer"
+        >
+          <span>展开控制台</span>
+          <ChevronDown class="w-3 h-3" />
+        </button>
       </div>
     </div>
 

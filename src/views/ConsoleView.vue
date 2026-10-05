@@ -15,6 +15,7 @@ import {
   CircleHelp,
   ChevronRight,
   ChevronDown,
+  ChevronsUpDown,
   Minus,
   Plus,
   Search,
@@ -40,6 +41,7 @@ import {
   Eye,
   EyeOff,
   Sliders,
+  SlidersHorizontal,
   ExternalLink,
   PanelLeftClose,
   PanelLeftOpen,
@@ -152,10 +154,69 @@ const currentTraffic = computed(() => {
   )
 })
 
-// 网络切换下拉框与新建网络模态框
-const showNetworkSwitcher = ref(false)
+// 专属网络切换面板模态框
+const showNetworkModal = ref(false)
 const showCreateNetworkModal = ref(false)
 const showNetworkSecret = ref(false)
+
+// 指标卡片自定义显示控制
+interface MetricVisibility {
+  onlineNodes: boolean
+  avgLatency: boolean
+  rxTraffic: boolean
+  txTraffic: boolean
+  p2pRate: boolean
+  ipv4Cidr: boolean
+  ipv6Cidr: boolean
+  secretKey: boolean
+}
+
+const defaultMetricVisibility: MetricVisibility = {
+  onlineNodes: true,
+  avgLatency: true,
+  rxTraffic: true,
+  txTraffic: true,
+  p2pRate: true,
+  ipv4Cidr: true,
+  ipv6Cidr: true,
+  secretKey: true,
+}
+
+const loadMetricVisibility = (): MetricVisibility => {
+  try {
+    const saved = localStorage.getItem('easytier_metric_visibility')
+    if (saved) return { ...defaultMetricVisibility, ...JSON.parse(saved) }
+  } catch {}
+  return { ...defaultMetricVisibility }
+}
+
+const metricVisibility = ref<MetricVisibility>(loadMetricVisibility())
+
+const toggleMetricVisibility = (key: keyof MetricVisibility) => {
+  metricVisibility.value[key] = !metricVisibility.value[key]
+  localStorage.setItem('easytier_metric_visibility', JSON.stringify(metricVisibility.value))
+}
+
+const showAllMetrics = () => {
+  for (const k of Object.keys(metricVisibility.value) as (keyof MetricVisibility)[]) {
+    metricVisibility.value[k] = true
+  }
+  localStorage.setItem('easytier_metric_visibility', JSON.stringify(metricVisibility.value))
+}
+
+const isMetricConfigOpen = ref(false)
+
+const metricToggleList = computed(() => [
+  { key: 'onlineNodes' as const, label: '在线节点数量', icon: Server },
+  { key: 'avgLatency' as const, label: '平均链路延迟', icon: Clock },
+  { key: 'rxTraffic' as const, label: '入网总流量 (RX)', icon: ArrowDownLeft },
+  { key: 'txTraffic' as const, label: '出网总流量 (TX)', icon: ArrowUpRight },
+  { key: 'p2pRate' as const, label: 'P2P 直连打洞率', icon: Zap },
+  { key: 'ipv4Cidr' as const, label: '虚拟 IPv4 网段', icon: Network },
+  { key: 'ipv6Cidr' as const, label: '虚拟 IPv6 网段', icon: Radio },
+  { key: 'secretKey' as const, label: '网络加入秘钥 (PSK)', icon: Key },
+])
+
 const newNetworkForm = ref({
   name: '',
   ipv4Cidr: '10.144.200.0/24',
@@ -610,7 +671,14 @@ const runAllTests = () => {
         >
           <Menu class="w-5 h-5" />
         </button>
-        <span class="font-semibold text-sm">{{ currentNetwork.name }}</span>
+        <button
+          type="button"
+          @click="showNetworkModal = true"
+          class="flex items-center gap-1.5 font-bold text-sm text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+        >
+          <span>{{ currentNetwork.name }}</span>
+          <ChevronsUpDown class="w-3.5 h-3.5 text-gray-400" />
+        </button>
       </div>
       <ThemeToggle />
     </header>
@@ -623,40 +691,34 @@ const runAllTests = () => {
         mobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
       ]"
     >
-      <!-- 网络为中心：可切换当前虚拟局域网的标题下拉栏 (带网络切换 Popover) -->
+      <!-- 网络为中心：可切换当前虚拟局域网的标题栏 (点击打开专属网络管理与切换面板) -->
       <div
         :class="[
           'relative h-14 border-b border-gray-200 dark:border-[#2f2e2e] flex items-center',
-          isSidebarCollapsed ? 'justify-center px-1' : 'justify-between px-3'
+          isSidebarCollapsed ? 'justify-center px-1' : 'justify-between px-2.5'
         ]"
       >
         <!-- 展开状态或移动端 -->
         <template v-if="!isSidebarCollapsed">
           <button
             type="button"
-            @click="showNetworkSwitcher = !showNetworkSwitcher"
-            class="flex items-center min-w-0 gap-2 hover:bg-gray-200/60 dark:hover:bg-gray-800 px-1.5 py-1 rounded-md transition-colors text-left"
-            title="点击切换或管理虚拟局域网"
+            @click="showNetworkModal = true"
+            class="flex items-center min-w-0 gap-2 hover:bg-gray-200/60 dark:hover:bg-gray-800 px-2 py-1.5 rounded-lg transition-colors text-left flex-1 group cursor-pointer"
+            title="点击打开虚拟网络切换与管理面板"
           >
-            <svg width="18" height="18" viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg" class="shrink-0 text-blue-600 dark:text-blue-400" aria-hidden="true">
-              <circle opacity="0.25" cx="3.4" cy="3.25" r="2.7" fill="currentColor"></circle>
-              <circle cx="3.4" cy="11.3" r="2.7" fill="currentColor"></circle>
-              <circle opacity="0.25" cx="3.4" cy="19.5" r="2.7" fill="currentColor"></circle>
-              <circle cx="11.5" cy="11.3" r="2.7" fill="currentColor"></circle>
-              <circle cx="11.5" cy="19.5" r="2.7" fill="currentColor"></circle>
-              <circle opacity="0.25" cx="11.5" cy="3.25" r="2.7" fill="currentColor"></circle>
-              <circle opacity="0.25" cx="19.5" cy="3.25" r="2.7" fill="currentColor"></circle>
-              <circle cx="19.5" cy="11.3" r="2.7" fill="currentColor"></circle>
-              <circle opacity="0.25" cx="19.5" cy="19.5" r="2.7" fill="currentColor"></circle>
-            </svg>
-            <span class="font-bold text-sm truncate text-gray-900 dark:text-gray-100 max-w-[96px]">{{ currentNetwork.name }}</span>
-            <ChevronDown class="w-3.5 h-3.5 text-gray-400 shrink-0" />
+            <div class="w-7 h-7 rounded-md bg-blue-100 dark:bg-blue-950/80 border border-blue-200/60 dark:border-blue-900/60 flex items-center justify-center shrink-0">
+              <Network class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div class="flex flex-col min-w-0 flex-1 leading-tight">
+              <span class="font-bold text-xs truncate text-gray-900 dark:text-gray-100 max-w-[125px]" :title="currentNetwork.name">{{ currentNetwork.name }}</span>
+              <span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium truncate mt-0.5">
+                ● 运行中 · {{ currentNetwork.onlineCount }}/{{ currentNetwork.nodeCount }}
+              </span>
+            </div>
+            <ChevronsUpDown class="w-3.5 h-3.5 text-gray-400 shrink-0 group-hover:text-gray-600 dark:group-hover:text-gray-300" />
           </button>
 
-          <div class="flex items-center gap-1">
-            <span class="inline-flex items-center px-1.5 py-0.5 text-[11px] font-medium border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 rounded">
-              正常运行
-            </span>
+          <div class="flex items-center gap-0.5 shrink-0 ml-1">
             <button
               type="button"
               @click="toggleSidebar"
@@ -679,7 +741,7 @@ const runAllTests = () => {
         <template v-else>
           <button
             type="button"
-            @click="showNetworkSwitcher = !showNetworkSwitcher"
+            @click="showNetworkModal = true"
             class="relative p-2 rounded-lg hover:bg-gray-200/60 dark:hover:bg-gray-800 transition-colors flex items-center justify-center text-blue-600 dark:text-blue-400 cursor-pointer"
             :title="`当前网络: ${currentNetwork.name} (点击切换网络)`"
           >
@@ -697,52 +759,6 @@ const runAllTests = () => {
             <span class="absolute bottom-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-[#1f1e1e]"></span>
           </button>
         </template>
-
-        <!-- 网络快速切换弹出面板 (Network Switcher Popover) -->
-        <div
-          v-if="showNetworkSwitcher"
-          :class="[
-            'absolute bg-white dark:bg-[#252424] rounded-lg border border-gray-200 dark:border-[#383737] shadow-xl p-2 z-50 text-xs space-y-1.5',
-            isSidebarCollapsed ? 'top-14 left-2 w-64' : 'top-14 left-2 right-2'
-          ]"
-        >
-          <div class="text-[10px] font-semibold text-gray-400 px-2 py-0.5 uppercase tracking-wider flex items-center justify-between">
-            <span>已加入的虚拟网络</span>
-            <span class="font-mono">{{ managedNetworks.length }} 个</span>
-          </div>
-
-          <div
-            v-for="net in managedNetworks"
-            :key="net.id"
-            @click="currentNetworkId = net.id; showNetworkSwitcher = false; showToast(`已切换至网络: ${net.name}`)"
-            :class="[
-              'p-2 rounded-md cursor-pointer transition-colors flex items-center justify-between',
-              currentNetworkId === net.id
-                ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-semibold'
-                : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
-            ]"
-          >
-            <div>
-              <div class="flex items-center gap-1.5">
-                <span class="font-bold">{{ net.name }}</span>
-                <span v-if="currentNetworkId === net.id" class="text-[9px] px-1 rounded bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">当前</span>
-              </div>
-              <div class="text-[10px] text-gray-400 font-mono mt-0.5">{{ net.ipv4Cidr }} · {{ net.onlineCount }}/{{ net.nodeCount }} 节点</div>
-            </div>
-            <Check v-if="currentNetworkId === net.id" class="w-3.5 h-3.5 text-blue-600" />
-          </div>
-
-          <div class="pt-1 border-t border-gray-100 dark:border-[#383737]">
-            <button
-              type="button"
-              @click="showCreateNetworkModal = true; showNetworkSwitcher = false"
-              class="w-full py-1.5 px-2 rounded text-left text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-50 dark:hover:bg-blue-950/40 flex items-center gap-1.5 cursor-pointer"
-            >
-              <Plus class="w-3.5 h-3.5" />
-              <span>新建或加入其他虚拟网络</span>
-            </button>
-          </div>
-        </div>
       </div>
 
       <!-- 折叠模式下的纯图标导航菜单 (桌面端) -->
@@ -1246,173 +1262,280 @@ const runAllTests = () => {
 
           <div class="flex items-center gap-2.5">
             <ThemeToggle class="hidden sm:inline-flex" />
+
+            <!-- 显示定制开关按钮与下拉菜单 -->
+            <div class="relative">
+              <button
+                type="button"
+                @click="isMetricConfigOpen = !isMetricConfigOpen"
+                :class="[
+                  'inline-flex items-center gap-1.5 px-3 h-9 rounded-md border text-xs font-medium transition-all shadow-2xs active:scale-[0.98] cursor-pointer',
+                  isMetricConfigOpen
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-300'
+                    : 'border-gray-300 dark:border-[#383737] bg-white dark:bg-[#282727] hover:bg-gray-50 dark:hover:bg-[#302f2f] text-gray-700 dark:text-gray-200'
+                ]"
+                title="自定义开启或关闭遥测指标卡片"
+              >
+                <SlidersHorizontal class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                <span>显示定制</span>
+                <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 font-mono">
+                  {{ Object.values(metricVisibility).filter(Boolean).length }}/8
+                </span>
+                <ChevronDown class="w-3 h-3 text-gray-400 ml-0.5" />
+              </button>
+
+              <!-- 自定义开关浮层菜单 -->
+              <div
+                v-if="isMetricConfigOpen"
+                class="absolute right-0 top-11 w-64 bg-white dark:bg-[#252424] rounded-xl border border-gray-200 dark:border-[#383737] shadow-xl p-2.5 z-40 text-xs space-y-2 animate-in fade-in duration-100"
+              >
+                <div class="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-[#333232]">
+                  <div>
+                    <span class="font-semibold text-gray-900 dark:text-white">指标卡片定制</span>
+                    <p class="text-[10px] text-gray-400">勾选开启或隐藏对应监控卡片</p>
+                  </div>
+                  <button
+                    type="button"
+                    @click="showAllMetrics"
+                    class="text-[11px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                  >
+                    全部开启
+                  </button>
+                </div>
+
+                <div class="space-y-1 max-h-64 overflow-y-auto pr-1">
+                  <label
+                    v-for="item in metricToggleList"
+                    :key="item.key"
+                    class="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/80 cursor-pointer select-none transition-colors"
+                  >
+                    <div class="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                      <component :is="item.icon" class="w-3.5 h-3.5 text-gray-400" />
+                      <span class="text-xs">{{ item.label }}</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      :checked="metricVisibility[item.key]"
+                      @change="toggleMetricVisibility(item.key)"
+                      class="w-4 h-4 text-blue-600 rounded border-gray-300 dark:border-gray-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                  </label>
+                </div>
+
+                <div class="pt-2 border-t border-gray-100 dark:border-[#333232] flex items-center justify-between text-[11px] text-gray-400">
+                  <span>配置自动保存至本地</span>
+                  <button
+                    type="button"
+                    @click="isMetricConfigOpen = false"
+                    class="px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 cursor-pointer"
+                  >
+                    完成
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <button
+              @click="showNetworkModal = true"
+              type="button"
+              class="inline-flex items-center gap-1.5 px-3 h-9 rounded-md border border-gray-300 dark:border-[#383737] bg-white dark:bg-[#282727] hover:bg-gray-50 dark:hover:bg-[#302f2f] text-gray-700 dark:text-gray-200 font-medium text-xs transition-all shadow-2xs active:scale-[0.98] cursor-pointer"
+              title="打开网络详细切换与管理面板"
+            >
+              <Network class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              <span>切换网络</span>
+            </button>
+
             <button
               @click="showCreateNetworkModal = true"
               type="button"
-              class="inline-flex items-center gap-2 px-3.5 h-9 rounded-md border border-gray-300 dark:border-[#383737] bg-white dark:bg-[#282727] hover:bg-gray-50 dark:hover:bg-[#302f2f] text-gray-700 dark:text-gray-200 font-medium text-sm transition-all shadow-2xs active:scale-[0.98] cursor-pointer"
+              class="inline-flex items-center gap-1.5 px-3.5 h-9 rounded-md border border-gray-300 dark:border-[#383737] bg-white dark:bg-[#282727] hover:bg-gray-50 dark:hover:bg-[#302f2f] text-gray-700 dark:text-gray-200 font-medium text-xs transition-all shadow-2xs active:scale-[0.98] cursor-pointer"
             >
-              <Plus class="w-4 h-4" />
+              <Plus class="w-3.5 h-3.5" />
               <span>新建网络</span>
             </button>
             <button
               @click="activeSubNav = 'machines'"
               type="button"
-              class="inline-flex items-center gap-2 px-3.5 h-9 rounded-md bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 text-white font-medium text-sm transition-all shadow-2xs active:scale-[0.98] cursor-pointer"
+              class="inline-flex items-center gap-1.5 px-3.5 h-9 rounded-md bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 text-white font-medium text-xs transition-all shadow-2xs active:scale-[0.98] cursor-pointer"
             >
               <span>查看全部设备 ({{ nodes.length }})</span>
-              <ArrowUpRight class="w-4 h-4" />
+              <ArrowUpRight class="w-3.5 h-3.5" />
             </button>
           </div>
         </header>
 
-        <!-- 当前网络核心关键参数与流量指标监控看板 (8 大子板块矩阵) -->
-        <div class="grid grid-cols-2 md:grid-cols-4 2xl:grid-cols-8 gap-3">
+        <!-- 当前网络核心关键参数与流量指标监控看板 (8 大子板块，4列 × 2排 宽裕布局) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
           <!-- 1. 在线节点数量 -->
-          <div class="p-3.5 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all">
+          <div
+            v-if="metricVisibility.onlineNodes"
+            class="p-4 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all"
+          >
             <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-              <span>在线节点数量</span>
-              <div class="p-1 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
-                <Server class="w-3.5 h-3.5" />
+              <span class="font-medium">在线节点数量</span>
+              <div class="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+                <Server class="w-4 h-4" />
               </div>
             </div>
-            <div class="mt-2 flex items-baseline gap-1.5">
-              <span class="text-xl font-bold font-mono text-gray-900 dark:text-white">{{ onlineNodesCount }}</span>
+            <div class="mt-3 flex items-baseline gap-2">
+              <span class="text-2xl font-bold font-mono text-gray-900 dark:text-white">{{ onlineNodesCount }}</span>
               <span class="text-xs text-gray-400 font-normal">/ {{ totalNodesCount }} 台</span>
             </div>
-            <div class="mt-2 flex items-center justify-between text-[11px]">
-              <span class="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <div class="mt-3 pt-2 border-t border-gray-100 dark:border-[#333232] flex items-center justify-between text-[11px]">
+              <span class="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                 <span>在线率 {{ onlinePercentage }}%</span>
               </span>
-              <span class="text-gray-400 dark:text-gray-500">{{ totalNodesCount - onlineNodesCount }} 离线</span>
+              <span class="text-gray-400 dark:text-gray-500 font-mono">{{ totalNodesCount - onlineNodesCount }} 离线</span>
             </div>
           </div>
 
           <!-- 2. 平均链路延迟 -->
-          <div class="p-3.5 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all">
+          <div
+            v-if="metricVisibility.avgLatency"
+            class="p-4 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all"
+          >
             <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-              <span>平均链路延迟</span>
-              <div class="p-1 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
-                <Clock class="w-3.5 h-3.5" />
+              <span class="font-medium">平均链路延迟</span>
+              <div class="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
+                <Clock class="w-4 h-4" />
               </div>
             </div>
-            <div class="mt-2 flex items-baseline gap-1">
-              <span class="text-xl font-bold font-mono text-gray-900 dark:text-white">{{ avgLatency }}</span>
+            <div class="mt-3 flex items-baseline gap-1.5">
+              <span class="text-2xl font-bold font-mono text-gray-900 dark:text-white">{{ avgLatency }}</span>
               <span class="text-xs text-gray-400 font-normal">ms</span>
             </div>
-            <div class="mt-2 flex items-center justify-between text-[11px]">
-              <span class="text-blue-600 dark:text-blue-400 font-medium">全网直连优良</span>
-              <span class="text-gray-400 dark:text-gray-500">抖动 ±3ms</span>
+            <div class="mt-3 pt-2 border-t border-gray-100 dark:border-[#333232] flex items-center justify-between text-[11px]">
+              <span class="text-blue-600 dark:text-blue-400 font-semibold">全网直连优良</span>
+              <span class="text-gray-400 dark:text-gray-500 font-mono">抖动 ±3ms</span>
             </div>
           </div>
 
           <!-- 3. 入网总流量 (RX) -->
-          <div class="p-3.5 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all">
+          <div
+            v-if="metricVisibility.rxTraffic"
+            class="p-4 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all"
+          >
             <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-              <span>入网总流量 (RX)</span>
-              <div class="p-1 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
-                <ArrowDownLeft class="w-3.5 h-3.5" />
+              <span class="font-medium">入网总流量 (RX)</span>
+              <div class="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+                <ArrowDownLeft class="w-4 h-4" />
               </div>
             </div>
-            <div class="mt-2">
-              <span class="text-xl font-bold font-mono text-gray-900 dark:text-white">{{ currentTraffic.rxTotal }}</span>
+            <div class="mt-3">
+              <span class="text-2xl font-bold font-mono text-gray-900 dark:text-white">{{ currentTraffic.rxTotal }}</span>
             </div>
-            <div class="mt-2 flex items-center justify-between text-[11px]">
-              <span class="text-emerald-600 dark:text-emerald-400 font-mono font-medium">↑ {{ currentTraffic.rxSpeed }}</span>
-              <span class="text-gray-400 dark:text-gray-500">今日累计</span>
+            <div class="mt-3 pt-2 border-t border-gray-100 dark:border-[#333232] flex items-center justify-between text-[11px]">
+              <span class="text-emerald-600 dark:text-emerald-400 font-mono font-semibold">↑ {{ currentTraffic.rxSpeed }}</span>
+              <span class="text-gray-400 dark:text-gray-500">今日累计接收</span>
             </div>
           </div>
 
           <!-- 4. 出网总流量 (TX) -->
-          <div class="p-3.5 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all">
+          <div
+            v-if="metricVisibility.txTraffic"
+            class="p-4 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all"
+          >
             <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-              <span>出网总流量 (TX)</span>
-              <div class="p-1 rounded-md bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400">
-                <ArrowUpRight class="w-3.5 h-3.5" />
+              <span class="font-medium">出网总流量 (TX)</span>
+              <div class="p-1.5 rounded-lg bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400">
+                <ArrowUpRight class="w-4 h-4" />
               </div>
             </div>
-            <div class="mt-2">
-              <span class="text-xl font-bold font-mono text-gray-900 dark:text-white">{{ currentTraffic.txTotal }}</span>
+            <div class="mt-3">
+              <span class="text-2xl font-bold font-mono text-gray-900 dark:text-white">{{ currentTraffic.txTotal }}</span>
             </div>
-            <div class="mt-2 flex items-center justify-between text-[11px]">
-              <span class="text-sky-600 dark:text-sky-400 font-mono font-medium">↓ {{ currentTraffic.txSpeed }}</span>
-              <span class="text-gray-400 dark:text-gray-500">今日累计</span>
+            <div class="mt-3 pt-2 border-t border-gray-100 dark:border-[#333232] flex items-center justify-between text-[11px]">
+              <span class="text-sky-600 dark:text-sky-400 font-mono font-semibold">↓ {{ currentTraffic.txSpeed }}</span>
+              <span class="text-gray-400 dark:text-gray-500">今日累计发送</span>
             </div>
           </div>
 
           <!-- 5. P2P 打洞直连率 -->
-          <div class="p-3.5 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all">
+          <div
+            v-if="metricVisibility.p2pRate"
+            class="p-4 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all"
+          >
             <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-              <span>P2P 直连打洞率</span>
-              <div class="p-1 rounded-md bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
-                <Zap class="w-3.5 h-3.5" />
+              <span class="font-medium">P2P 直连打洞率</span>
+              <div class="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
+                <Zap class="w-4 h-4" />
               </div>
             </div>
-            <div class="mt-2 flex items-baseline gap-1">
-              <span class="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400">{{ p2pSuccessRate }}%</span>
+            <div class="mt-3 flex items-baseline gap-1.5">
+              <span class="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">{{ p2pSuccessRate }}%</span>
             </div>
-            <div class="mt-2 flex items-center justify-between text-[11px] text-gray-400 dark:text-gray-500">
-              <span>{{ p2pNodesCount }} 节点直连</span>
-              <span>{{ relayNodesCount }} 中继</span>
+            <div class="mt-3 pt-2 border-t border-gray-100 dark:border-[#333232] flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400">
+              <span class="font-medium text-emerald-600 dark:text-emerald-400">{{ p2pNodesCount }} 节点直连</span>
+              <span class="font-medium text-sky-600 dark:text-sky-400">{{ relayNodesCount }} 节点中继</span>
             </div>
           </div>
 
           <!-- 6. 虚拟 IPv4 广播网段 -->
-          <div class="p-3.5 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all">
+          <div
+            v-if="metricVisibility.ipv4Cidr"
+            class="p-4 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all"
+          >
             <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-              <span>虚拟 IPv4 网段</span>
-              <div class="p-1 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
-                <Network class="w-3.5 h-3.5" />
+              <span class="font-medium">虚拟 IPv4 网段</span>
+              <div class="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+                <Network class="w-4 h-4" />
               </div>
             </div>
-            <div class="mt-2">
-              <span class="text-base font-bold font-mono text-gray-900 dark:text-white truncate block">{{ currentNetwork.ipv4Cidr }}</span>
+            <div class="mt-3">
+              <span class="text-lg font-bold font-mono text-gray-900 dark:text-white truncate block">{{ currentNetwork.ipv4Cidr }}</span>
             </div>
-            <div class="mt-2 flex items-center justify-between text-[11px]">
-              <span class="text-emerald-600 dark:text-emerald-400 font-medium">DHCP 分配正常</span>
-              <span class="text-gray-400 font-mono">/24</span>
+            <div class="mt-3 pt-2 border-t border-gray-100 dark:border-[#333232] flex items-center justify-between text-[11px]">
+              <span class="text-emerald-600 dark:text-emerald-400 font-semibold">DHCP 寻址正常</span>
+              <span class="text-gray-400 font-mono">/24 网段</span>
             </div>
           </div>
 
           <!-- 7. 虚拟 IPv6 独占网段 -->
-          <div class="p-3.5 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all">
+          <div
+            v-if="metricVisibility.ipv6Cidr"
+            class="p-4 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all"
+          >
             <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-              <span>虚拟 IPv6 网段</span>
-              <div class="p-1 rounded-md bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
-                <Radio class="w-3.5 h-3.5" />
+              <span class="font-medium">虚拟 IPv6 网段</span>
+              <div class="p-1.5 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
+                <Radio class="w-4 h-4" />
               </div>
             </div>
-            <div class="mt-2">
+            <div class="mt-3">
               <span class="text-base font-bold font-mono text-gray-900 dark:text-white truncate block" :title="currentNetwork.ipv6Cidr">{{ currentNetwork.ipv6Cidr }}</span>
             </div>
-            <div class="mt-2 flex items-center justify-between text-[11px]">
-              <span class="text-blue-600 dark:text-blue-400 font-medium">原生双栈支持</span>
-              <span class="text-gray-400 font-mono">/64</span>
+            <div class="mt-3 pt-2 border-t border-gray-100 dark:border-[#333232] flex items-center justify-between text-[11px]">
+              <span class="text-purple-600 dark:text-purple-400 font-semibold">原生双栈就绪</span>
+              <span class="text-gray-400 font-mono">/64 路由</span>
             </div>
           </div>
 
           <!-- 8. 网络加入令牌 (PSK) -->
-          <div class="p-3.5 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all">
+          <div
+            v-if="metricVisibility.secretKey"
+            class="p-4 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all"
+          >
             <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-              <span>网络加入令牌 (PSK)</span>
-              <div class="p-1 rounded-md bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400">
-                <Key class="w-3.5 h-3.5" />
+              <span class="font-medium">网络加入令牌 (PSK)</span>
+              <div class="p-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400">
+                <Key class="w-4 h-4" />
               </div>
             </div>
-            <div class="mt-2 flex items-center justify-between">
-              <span class="text-sm font-mono text-gray-800 dark:text-gray-200 truncate max-w-[100px]">
+            <div class="mt-3 flex items-center justify-between">
+              <span class="text-sm font-mono text-gray-800 dark:text-gray-200 truncate max-w-[140px]">
                 {{ showNetworkSecret ? currentNetwork.secretKey : '••••••••••••' }}
               </span>
               <button
                 type="button"
                 @click="showNetworkSecret = !showNetworkSecret"
-                class="p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
+                class="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
                 title="显示/隐藏密钥"
               >
-                <component :is="showNetworkSecret ? EyeOff : Eye" class="w-3.5 h-3.5" />
+                <component :is="showNetworkSecret ? EyeOff : Eye" class="w-4 h-4" />
               </button>
             </div>
-            <div class="mt-2 flex items-center justify-between text-[11px]">
+            <div class="mt-3 pt-2 border-t border-gray-100 dark:border-[#333232] flex items-center justify-between text-[11px]">
               <button
                 type="button"
                 @click="copyText(currentNetwork.secretKey, '网络加入密钥')"
@@ -1421,8 +1544,23 @@ const runAllTests = () => {
                 <Copy class="w-3 h-3" />
                 <span>复制密钥</span>
               </button>
-              <span class="text-emerald-600 dark:text-emerald-400">已保护</span>
+              <span class="text-emerald-600 dark:text-emerald-400 font-medium">端到端加密</span>
             </div>
+          </div>
+
+          <!-- 全部隐藏时的占位提示 -->
+          <div
+            v-if="!metricVisibility.onlineNodes && !metricVisibility.avgLatency && !metricVisibility.rxTraffic && !metricVisibility.txTraffic && !metricVisibility.p2pRate && !metricVisibility.ipv4Cidr && !metricVisibility.ipv6Cidr && !metricVisibility.secretKey"
+            class="col-span-full py-8 text-center rounded-xl border border-dashed border-gray-300 dark:border-gray-700 bg-white/50 dark:bg-[#252424]/50 text-gray-500 dark:text-gray-400 text-xs flex flex-col items-center justify-center gap-2.5"
+          >
+            <span>当前已隐藏所有监控板块</span>
+            <button
+              type="button"
+              @click="showAllMetrics"
+              class="px-3.5 py-1.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors cursor-pointer text-xs shadow-2xs"
+            >
+              一键恢复显示全部卡片
+            </button>
           </div>
         </div>
 
@@ -2215,16 +2353,24 @@ enable_exit_node = true
       @click="drawerOpen = false"
     >
       <div
-        class="w-full max-w-lg bg-white dark:bg-[#1f1e1e] h-full shadow-2xl flex flex-col border-l border-gray-200 dark:border-[#2f2e2e] transition-transform duration-200"
+        class="w-full max-w-xl bg-white dark:bg-[#1f1e1e] h-full shadow-2xl flex flex-col border-l border-gray-200 dark:border-[#2f2e2e] transition-transform duration-200"
         @click.stop
       >
-        <div class="p-4 sm:p-5 border-b border-gray-200 dark:border-[#2f2e2e] flex items-center justify-between bg-gray-50/60 dark:bg-[#252424]">
+        <div class="p-4 sm:p-5 border-b border-gray-200 dark:border-[#2f2e2e] flex items-center justify-between bg-gray-50/70 dark:bg-[#252424]">
           <div class="flex items-center gap-3">
-            <span :class="['w-3 h-3 rounded-full', activeNode?.status === 'online' ? 'bg-emerald-500' : 'bg-gray-400']"></span>
+            <span :class="['w-3.5 h-3.5 rounded-full ring-4 shrink-0', activeNode?.status === 'online' ? 'bg-emerald-500 ring-emerald-500/20' : 'bg-gray-400 ring-gray-400/20']"></span>
             <div>
-              <h3 class="font-bold text-base text-gray-900 dark:text-white leading-none">
-                {{ activeNode?.hostname }}
-              </h3>
+              <div class="flex items-center gap-2">
+                <h3 class="font-bold text-base text-gray-900 dark:text-white leading-none">
+                  {{ activeNode?.hostname }}
+                </h3>
+                <span :class="['px-2 py-0.5 rounded text-[10px] font-semibold', activeNode?.status === 'online' ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300' : 'bg-gray-100 dark:bg-gray-800 text-gray-500']">
+                  {{ activeNode?.status === 'online' ? '在线' : '离线' }}
+                </span>
+                <span class="px-2 py-0.5 rounded text-[10px] bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-mono">
+                  {{ activeNode?.osType }}
+                </span>
+              </div>
               <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 font-mono">
                 {{ activeNode?.locationName }} · {{ activeNode?.domain }}
               </p>
@@ -2244,49 +2390,53 @@ enable_exit_node = true
             type="button"
             @click="drawerTab = 'details'"
             :class="[
-              'py-3 border-b-2 transition-colors cursor-pointer',
+              'py-3 border-b-2 flex items-center gap-1.5 transition-colors cursor-pointer',
               drawerTab === 'details'
                 ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-semibold'
                 : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
             ]"
           >
-            节点详情
+            <Server class="w-3.5 h-3.5" />
+            <span>节点详情</span>
           </button>
           <button
             type="button"
             @click="drawerTab = 'routing'"
             :class="[
-              'py-3 border-b-2 transition-colors cursor-pointer',
+              'py-3 border-b-2 flex items-center gap-1.5 transition-colors cursor-pointer',
               drawerTab === 'routing'
                 ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-semibold'
                 : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
             ]"
           >
-            子网与出口路由
+            <GitFork class="w-3.5 h-3.5" />
+            <span>子网与出口路由</span>
           </button>
           <button
             type="button"
             @click="drawerTab = 'peers'"
             :class="[
-              'py-3 border-b-2 transition-colors cursor-pointer',
+              'py-3 border-b-2 flex items-center gap-1.5 transition-colors cursor-pointer',
               drawerTab === 'peers'
                 ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-semibold'
                 : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
             ]"
           >
-            P2P 对端链路 ({{ activeNode?.peersList?.length || 0 }})
+            <Zap class="w-3.5 h-3.5" />
+            <span>P2P 对端链路 ({{ activeNode?.peersList?.length || 0 }})</span>
           </button>
           <button
             type="button"
             @click="drawerTab = 'toml'"
             :class="[
-              'py-3 border-b-2 transition-colors cursor-pointer',
+              'py-3 border-b-2 flex items-center gap-1.5 transition-colors cursor-pointer',
               drawerTab === 'toml'
                 ? 'border-blue-600 text-blue-600 dark:text-blue-400 font-semibold'
                 : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
             ]"
           >
-            TOML 配置文件
+            <FolderGit2 class="w-3.5 h-3.5" />
+            <span>TOML 配置文件</span>
           </button>
         </div>
 
@@ -2544,6 +2694,209 @@ proxy_cidrs = [{{ (activeNode?.subnets || []).map((s: string) => `"${s}"`).join(
               模拟设备接入
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 专属网络切换与拓扑管理弹出面板 (Network Switcher & Detail Modal) ==================== -->
+    <div
+      v-if="showNetworkModal"
+      class="fixed inset-0 z-50 overflow-hidden bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6"
+      @click="showNetworkModal = false"
+    >
+      <div
+        class="w-full max-w-3xl bg-white dark:bg-[#1f1e1e] rounded-2xl shadow-2xl border border-gray-200 dark:border-[#2f2e2e] overflow-hidden flex flex-col max-h-[90vh]"
+        @click.stop
+      >
+        <!-- 头部 -->
+        <div class="p-5 border-b border-gray-200 dark:border-[#2f2e2e] flex items-center justify-between bg-gray-50/70 dark:bg-[#252424]">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-950/80 border border-blue-200/60 dark:border-blue-900/60 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+              <Network class="w-5 h-5" />
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="font-bold text-base sm:text-lg text-gray-900 dark:text-white">虚拟局域网管理与快速切换</h3>
+                <span class="px-2 py-0.5 rounded-full text-[11px] font-mono bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-900/60">
+                  {{ managedNetworks.length }} 个网络
+                </span>
+              </div>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                当前运行主控：<span class="font-bold text-gray-800 dark:text-gray-200">{{ currentNetwork.name }}</span> ({{ currentNetwork.ipv4Cidr }}) · 支持查看底层 CIDR、中继与密钥
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            @click="showNetworkModal = false"
+            class="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-95 transition-all cursor-pointer"
+          >
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+
+        <!-- 网络卡片列表 -->
+        <div class="p-5 overflow-y-auto space-y-4 text-xs flex-1">
+          <div
+            v-for="net in managedNetworks"
+            :key="net.id"
+            :class="[
+              'rounded-xl border p-4 transition-all relative',
+              currentNetworkId === net.id
+                ? 'border-blue-500/80 bg-blue-50/20 dark:bg-blue-950/20 shadow-xs ring-1 ring-blue-500/30'
+                : 'border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] hover:border-gray-300 dark:hover:border-gray-700'
+            ]"
+          >
+            <!-- 卡片头部: 状态, 名称, 切换按钮 -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-gray-100 dark:border-[#333232]">
+              <div class="flex items-center gap-2.5">
+                <span class="w-3 h-3 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20 shrink-0"></span>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="font-bold text-sm text-gray-900 dark:text-white">{{ net.name }}</span>
+                    <span
+                      v-if="currentNetworkId === net.id"
+                      class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-600 text-white"
+                    >
+                      当前生效
+                    </span>
+                    <span v-else class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
+                      待机中
+                    </span>
+                  </div>
+                  <span class="text-[11px] text-gray-400 mt-0.5 block font-mono">创建日期: {{ net.createdDate }} · 状态: 正常运行</span>
+                </div>
+              </div>
+
+              <!-- 切换或当前状态按钮 -->
+              <div>
+                <button
+                  v-if="currentNetworkId !== net.id"
+                  type="button"
+                  @click="currentNetworkId = net.id; showNetworkModal = false; showToast(`已成功切换至主控网络: ${net.name}`)"
+                  class="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs shadow-2xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <RotateCw class="w-3.5 h-3.5" />
+                  <span>切换为此网络</span>
+                </button>
+                <div v-else class="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-semibold text-xs px-2 py-1">
+                  <CheckCircle2 class="w-4 h-4" />
+                  <span>当前主控中</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 网络详细拓扑与技术参数 4 列网格 -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-3">
+              <!-- 1. IPv4 CIDR -->
+              <div class="p-2.5 rounded-lg bg-gray-50/80 dark:bg-[#1f1e1e] border border-gray-100 dark:border-[#333232]">
+                <div class="text-[10px] text-gray-400 mb-1 flex items-center justify-between">
+                  <span>虚拟 IPv4 网段</span>
+                  <Network class="w-3 h-3 text-indigo-500" />
+                </div>
+                <div class="font-mono font-bold text-gray-900 dark:text-white truncate" :title="net.ipv4Cidr">
+                  {{ net.ipv4Cidr }}
+                </div>
+                <div class="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 font-medium">DHCP 动态分配</div>
+              </div>
+
+              <!-- 2. IPv6 CIDR -->
+              <div class="p-2.5 rounded-lg bg-gray-50/80 dark:bg-[#1f1e1e] border border-gray-100 dark:border-[#333232]">
+                <div class="text-[10px] text-gray-400 mb-1 flex items-center justify-between">
+                  <span>虚拟 IPv6 网段</span>
+                  <Radio class="w-3 h-3 text-purple-500" />
+                </div>
+                <div class="font-mono font-bold text-gray-900 dark:text-white truncate" :title="net.ipv6Cidr">
+                  {{ net.ipv6Cidr }}
+                </div>
+                <div class="text-[10px] text-purple-600 dark:text-purple-400 mt-1 font-medium">/64 双栈通信</div>
+              </div>
+
+              <!-- 3. 在线节点状态 -->
+              <div class="p-2.5 rounded-lg bg-gray-50/80 dark:bg-[#1f1e1e] border border-gray-100 dark:border-[#333232]">
+                <div class="text-[10px] text-gray-400 mb-1 flex items-center justify-between">
+                  <span>在线设备比例</span>
+                  <Server class="w-3 h-3 text-emerald-500" />
+                </div>
+                <div class="font-mono font-bold text-gray-900 dark:text-white">
+                  {{ net.onlineCount }} <span class="text-xs font-normal text-gray-400">/ {{ net.nodeCount }} 台</span>
+                </div>
+                <div class="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 font-medium flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  <span>就绪率 {{ Math.round((net.onlineCount / net.nodeCount) * 100) }}%</span>
+                </div>
+              </div>
+
+              <!-- 4. RPC 发现门户 -->
+              <div class="p-2.5 rounded-lg bg-gray-50/80 dark:bg-[#1f1e1e] border border-gray-100 dark:border-[#333232]">
+                <div class="text-[10px] text-gray-400 mb-1 flex items-center justify-between">
+                  <span>RPC 发现门户</span>
+                  <Activity class="w-3 h-3 text-blue-500" />
+                </div>
+                <div class="font-mono text-xs font-medium text-gray-900 dark:text-white truncate" :title="net.rpcPortal">
+                  {{ net.rpcPortal }}
+                </div>
+                <div class="mt-1">
+                  <button
+                    type="button"
+                    @click="copyText(net.rpcPortal, 'RPC 门户')"
+                    class="text-[10px] text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Copy class="w-2.5 h-2.5" />
+                    <span>复制门户地址</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 底层通信密钥与中继集群条目 -->
+            <div class="mt-3 pt-2.5 border-t border-gray-100 dark:border-[#333232] flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px]">
+              <!-- 通信 PSK 密钥 -->
+              <div class="flex items-center gap-2">
+                <span class="text-gray-400 shrink-0">入网凭证 (PSK):</span>
+                <span class="font-mono font-semibold text-gray-800 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                  {{ showNetworkSecret ? net.secretKey : '••••••••••••' }}
+                </span>
+                <button
+                  type="button"
+                  @click="copyText(net.secretKey, '网络 PSK 密钥')"
+                  class="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5 cursor-pointer font-medium"
+                >
+                  <Copy class="w-3 h-3" />
+                  <span>复制</span>
+                </button>
+              </div>
+
+              <!-- 中继服务器 Hubs -->
+              <div class="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+                <span class="shrink-0">中继节点:</span>
+                <span v-if="net.relayHubs.length > 0" class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300">
+                  {{ net.relayHubs.join(', ') }}
+                </span>
+                <span v-else class="text-[10px] text-gray-400 italic">EasyTier 官方全球中继集群</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 弹窗底部操作条 -->
+        <div class="p-4 border-t border-gray-200 dark:border-[#2f2e2e] bg-gray-50 dark:bg-[#252424] flex items-center justify-between">
+          <button
+            type="button"
+            @click="showCreateNetworkModal = true; showNetworkModal = false"
+            class="px-3.5 py-1.5 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-400 text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1.5 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors cursor-pointer text-xs"
+          >
+            <Plus class="w-3.5 h-3.5" />
+            <span>新建或加入其他虚拟局域网</span>
+          </button>
+
+          <button
+            type="button"
+            @click="showNetworkModal = false"
+            class="px-4 py-1.5 rounded-lg bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 font-medium transition-colors cursor-pointer text-xs"
+          >
+            关闭
+          </button>
         </div>
       </div>
     </div>
