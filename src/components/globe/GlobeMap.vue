@@ -35,9 +35,11 @@ const props = withDefaults(
   defineProps<{
     devices: GlobeDevice[]
     isDark?: boolean
+    heightClass?: string
   }>(),
   {
     isDark: false,
+    heightClass: '',
   }
 )
 
@@ -266,7 +268,12 @@ defineExpose({
 </script>
 
 <template>
-  <div class="relative w-full h-[580px] rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#0a0e15] overflow-hidden select-none shadow-2xs group font-sans">
+  <div
+    :class="[
+      'relative w-full rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#0a0e15] overflow-hidden select-none shadow-2xs group font-sans',
+      heightClass || 'h-[calc(100vh-270px)] min-h-[640px]'
+    ]"
+  >
     
     <!-- 大气层柔和背景光晕 (精确还原 peer.as 站点淡天蓝氛围) -->
     <div

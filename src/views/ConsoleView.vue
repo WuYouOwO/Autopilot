@@ -41,6 +41,9 @@ import {
   EyeOff,
   Sliders,
   ExternalLink,
+  PanelLeftClose,
+  PanelLeftOpen,
+  LayoutDashboard,
 } from 'lucide-vue-next'
 
 // --- 多网络管理状态 (按照“网络为中心”进行管理) ---
@@ -120,12 +123,19 @@ const newNetworkForm = ref({
 
 // --- 导航菜单状态定义 ---
 type SubNavItem = 'network-overview' | 'machines' | 'subnets' | 'stun' | 'policies' | 'tests' | 'toml' | 'logs' | 'settings'
-const activeSubNav = ref<SubNavItem>('machines')
+const activeSubNav = ref<SubNavItem>('network-overview')
+
+// 侧边栏折叠状态 (桌面端一键收起，只保留图标)
+const isSidebarCollapsed = ref(localStorage.getItem('easytier_sidebar_collapsed') === 'true')
+const toggleSidebar = () => {
+  isSidebarCollapsed.value = !isSidebarCollapsed.value
+  localStorage.setItem('easytier_sidebar_collapsed', String(isSidebarCollapsed.value))
+}
 
 // 显示模式切换：列表模式 vs 网络拓扑图 vs 全球 3D 球形地图模式
 const displayMode = ref<'table' | 'topology' | 'globe'>('table')
-// 网络总览视图切换：网络拓扑 (默认) vs 3D 数字地球
-const overviewViewTab = ref<'topology' | 'globe'>('topology')
+// 网络总览视图切换：网络拓扑 (默认) vs 3D 数字地球 vs 双图同屏
+const overviewViewTab = ref<'topology' | 'globe' | 'split'>('topology')
 
 // 移动端菜单抽屉状态
 const mobileMenuOpen = ref(false)
@@ -540,53 +550,96 @@ const runAllTests = () => {
       <ThemeToggle />
     </header>
 
-    <!-- ==================== 左侧固定导航栏 (修复指示条偏移 + 网络为中心管理) ==================== -->
+    <!-- ==================== 左侧固定导航栏 (可一键收起为纯图标模式) ==================== -->
     <aside
       :class="[
-        'fixed top-0 bottom-0 left-0 w-60 border-r border-gray-200 dark:border-[#2f2e2e] bg-[#f9fafb] dark:bg-[#1f1e1e] z-50 select-none flex flex-col transition-transform duration-200 lg:translate-x-0',
+        'fixed top-0 bottom-0 left-0 border-r border-gray-200 dark:border-[#2f2e2e] bg-[#f9fafb] dark:bg-[#1f1e1e] z-50 select-none flex flex-col transition-all duration-200 ease-in-out lg:translate-x-0',
+        isSidebarCollapsed ? 'w-60 lg:w-16' : 'w-60 lg:w-60',
         mobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
       ]"
     >
       <!-- 网络为中心：可切换当前虚拟局域网的标题下拉栏 (带网络切换 Popover) -->
-      <div class="relative h-14 px-3 border-b border-gray-200 dark:border-[#2f2e2e] flex items-center justify-between">
-        <button
-          type="button"
-          @click="showNetworkSwitcher = !showNetworkSwitcher"
-          class="flex items-center min-w-0 gap-2 hover:bg-gray-200/60 dark:hover:bg-gray-800 px-1.5 py-1 rounded-md transition-colors text-left"
-          title="点击切换或管理虚拟局域网"
-        >
-          <svg width="18" height="18" viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg" class="shrink-0 text-blue-600 dark:text-blue-400" aria-hidden="true">
-            <circle opacity="0.25" cx="3.4" cy="3.25" r="2.7" fill="currentColor"></circle>
-            <circle cx="3.4" cy="11.3" r="2.7" fill="currentColor"></circle>
-            <circle opacity="0.25" cx="3.4" cy="19.5" r="2.7" fill="currentColor"></circle>
-            <circle cx="11.5" cy="11.3" r="2.7" fill="currentColor"></circle>
-            <circle cx="11.5" cy="19.5" r="2.7" fill="currentColor"></circle>
-            <circle opacity="0.25" cx="11.5" cy="3.25" r="2.7" fill="currentColor"></circle>
-            <circle opacity="0.25" cx="19.5" cy="3.25" r="2.7" fill="currentColor"></circle>
-            <circle cx="19.5" cy="11.3" r="2.7" fill="currentColor"></circle>
-            <circle opacity="0.25" cx="19.5" cy="19.5" r="2.7" fill="currentColor"></circle>
-          </svg>
-          <span class="font-bold text-sm truncate text-gray-900 dark:text-gray-100 max-w-[100px]">{{ currentNetwork.name }}</span>
-          <ChevronDown class="w-3.5 h-3.5 text-gray-400 shrink-0" />
-        </button>
-
-        <div class="flex items-center gap-1.5">
-          <span class="inline-flex items-center px-1.5 py-0.5 text-[11px] font-medium border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 rounded">
-            正常运行
-          </span>
+      <div
+        :class="[
+          'relative h-14 border-b border-gray-200 dark:border-[#2f2e2e] flex items-center',
+          isSidebarCollapsed ? 'justify-center px-1' : 'justify-between px-3'
+        ]"
+      >
+        <!-- 展开状态或移动端 -->
+        <template v-if="!isSidebarCollapsed">
           <button
             type="button"
-            @click="mobileMenuOpen = false"
-            class="lg:hidden p-1 text-gray-400 hover:text-gray-600"
+            @click="showNetworkSwitcher = !showNetworkSwitcher"
+            class="flex items-center min-w-0 gap-2 hover:bg-gray-200/60 dark:hover:bg-gray-800 px-1.5 py-1 rounded-md transition-colors text-left"
+            title="点击切换或管理虚拟局域网"
           >
-            <X class="w-4 h-4" />
+            <svg width="18" height="18" viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg" class="shrink-0 text-blue-600 dark:text-blue-400" aria-hidden="true">
+              <circle opacity="0.25" cx="3.4" cy="3.25" r="2.7" fill="currentColor"></circle>
+              <circle cx="3.4" cy="11.3" r="2.7" fill="currentColor"></circle>
+              <circle opacity="0.25" cx="3.4" cy="19.5" r="2.7" fill="currentColor"></circle>
+              <circle cx="11.5" cy="11.3" r="2.7" fill="currentColor"></circle>
+              <circle cx="11.5" cy="19.5" r="2.7" fill="currentColor"></circle>
+              <circle opacity="0.25" cx="11.5" cy="3.25" r="2.7" fill="currentColor"></circle>
+              <circle opacity="0.25" cx="19.5" cy="3.25" r="2.7" fill="currentColor"></circle>
+              <circle cx="19.5" cy="11.3" r="2.7" fill="currentColor"></circle>
+              <circle opacity="0.25" cx="19.5" cy="19.5" r="2.7" fill="currentColor"></circle>
+            </svg>
+            <span class="font-bold text-sm truncate text-gray-900 dark:text-gray-100 max-w-[96px]">{{ currentNetwork.name }}</span>
+            <ChevronDown class="w-3.5 h-3.5 text-gray-400 shrink-0" />
           </button>
-        </div>
+
+          <div class="flex items-center gap-1">
+            <span class="inline-flex items-center px-1.5 py-0.5 text-[11px] font-medium border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 rounded">
+              正常运行
+            </span>
+            <button
+              type="button"
+              @click="toggleSidebar"
+              class="hidden lg:flex p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded-md hover:bg-gray-200/60 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+              title="收起侧边栏 (仅保留图标)"
+            >
+              <PanelLeftClose class="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              @click="mobileMenuOpen = false"
+              class="lg:hidden p-1 text-gray-400 hover:text-gray-600"
+            >
+              <X class="w-4 h-4" />
+            </button>
+          </div>
+        </template>
+
+        <!-- 折叠状态 (桌面端) -->
+        <template v-else>
+          <button
+            type="button"
+            @click="showNetworkSwitcher = !showNetworkSwitcher"
+            class="relative p-2 rounded-lg hover:bg-gray-200/60 dark:hover:bg-gray-800 transition-colors flex items-center justify-center text-blue-600 dark:text-blue-400 cursor-pointer"
+            :title="`当前网络: ${currentNetwork.name} (点击切换网络)`"
+          >
+            <svg width="22" height="22" viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <circle opacity="0.25" cx="3.4" cy="3.25" r="2.7" fill="currentColor"></circle>
+              <circle cx="3.4" cy="11.3" r="2.7" fill="currentColor"></circle>
+              <circle opacity="0.25" cx="3.4" cy="19.5" r="2.7" fill="currentColor"></circle>
+              <circle cx="11.5" cy="11.3" r="2.7" fill="currentColor"></circle>
+              <circle cx="11.5" cy="19.5" r="2.7" fill="currentColor"></circle>
+              <circle opacity="0.25" cx="11.5" cy="3.25" r="2.7" fill="currentColor"></circle>
+              <circle opacity="0.25" cx="19.5" cy="3.25" r="2.7" fill="currentColor"></circle>
+              <circle cx="19.5" cy="11.3" r="2.7" fill="currentColor"></circle>
+              <circle opacity="0.25" cx="19.5" cy="19.5" r="2.7" fill="currentColor"></circle>
+            </svg>
+            <span class="absolute bottom-1 right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-[#1f1e1e]"></span>
+          </button>
+        </template>
 
         <!-- 网络快速切换弹出面板 (Network Switcher Popover) -->
         <div
           v-if="showNetworkSwitcher"
-          class="absolute top-14 left-2 right-2 bg-white dark:bg-[#252424] rounded-lg border border-gray-200 dark:border-[#383737] shadow-xl p-2 z-50 text-xs space-y-1.5"
+          :class="[
+            'absolute bg-white dark:bg-[#252424] rounded-lg border border-gray-200 dark:border-[#383737] shadow-xl p-2 z-50 text-xs space-y-1.5',
+            isSidebarCollapsed ? 'top-14 left-2 w-64' : 'top-14 left-2 right-2'
+          ]"
         >
           <div class="text-[10px] font-semibold text-gray-400 px-2 py-0.5 uppercase tracking-wider flex items-center justify-between">
             <span>已加入的虚拟网络</span>
@@ -618,7 +671,7 @@ const runAllTests = () => {
             <button
               type="button"
               @click="showCreateNetworkModal = true; showNetworkSwitcher = false"
-              class="w-full py-1.5 px-2 rounded text-left text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-50 dark:hover:bg-blue-950/40 flex items-center gap-1.5"
+              class="w-full py-1.5 px-2 rounded text-left text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-50 dark:hover:bg-blue-950/40 flex items-center gap-1.5 cursor-pointer"
             >
               <Plus class="w-3.5 h-3.5" />
               <span>新建或加入其他虚拟网络</span>
@@ -627,10 +680,238 @@ const runAllTests = () => {
         </div>
       </div>
 
-      <!-- 导航列表项 (精确修复树形指示条偏移对齐) -->
-      <div class="flex-1 overflow-y-auto px-2 py-3 space-y-0.5 text-sm">
-        
-        <!-- 1. 网络与节点分组 -->
+      <!-- 折叠模式下的纯图标导航菜单 (桌面端) -->
+      <div v-if="isSidebarCollapsed" class="hidden lg:flex flex-1 flex-col items-center py-3 px-1 space-y-1.5 overflow-y-auto">
+        <!-- 1. 网络总览 (独立一级) -->
+        <button
+          type="button"
+          @click="activeSubNav = 'network-overview'"
+          title="网络总览"
+          :class="[
+            'relative w-10 h-10 rounded-lg flex items-center justify-center transition-all cursor-pointer active:scale-95',
+            activeSubNav === 'network-overview'
+              ? 'bg-[#ebebeb] dark:bg-[#2e2d2d] text-blue-600 dark:text-blue-400 shadow-2xs font-bold'
+              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200/60 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+          ]"
+        >
+          <Activity class="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          <span
+            v-if="activeSubNav === 'network-overview'"
+            class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r bg-blue-600 dark:bg-blue-400"
+          ></span>
+        </button>
+
+        <div class="w-6 border-t border-gray-200 dark:border-[#333232] my-1"></div>
+
+        <!-- 2. 设备节点 -->
+        <button
+          type="button"
+          @click="activeSubNav = 'machines'"
+          title="设备节点"
+          :class="[
+            'relative w-10 h-10 rounded-lg flex items-center justify-center transition-all cursor-pointer active:scale-95',
+            activeSubNav === 'machines'
+              ? 'bg-[#ebebeb] dark:bg-[#2e2d2d] text-gray-900 dark:text-white shadow-2xs font-bold'
+              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200/60 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+          ]"
+        >
+          <Server class="w-5 h-5" />
+          <span
+            v-if="activeSubNav === 'machines'"
+            class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r bg-gray-700 dark:bg-gray-200"
+          ></span>
+        </button>
+
+        <!-- 3. 子网路由 -->
+        <button
+          type="button"
+          @click="activeSubNav = 'subnets'"
+          title="子网路由 (Proxy CIDR)"
+          :class="[
+            'relative w-10 h-10 rounded-lg flex items-center justify-center transition-all cursor-pointer active:scale-95',
+            activeSubNav === 'subnets'
+              ? 'bg-[#ebebeb] dark:bg-[#2e2d2d] text-gray-900 dark:text-white shadow-2xs font-bold'
+              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200/60 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+          ]"
+        >
+          <GitFork class="w-5 h-5" />
+          <span
+            v-if="activeSubNav === 'subnets'"
+            class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r bg-gray-700 dark:bg-gray-200"
+          ></span>
+        </button>
+
+        <!-- 4. STUN 穿透与中继 -->
+        <button
+          type="button"
+          @click="activeSubNav = 'stun'"
+          title="STUN 穿透与中继"
+          :class="[
+            'relative w-10 h-10 rounded-lg flex items-center justify-center transition-all cursor-pointer active:scale-95',
+            activeSubNav === 'stun'
+              ? 'bg-[#ebebeb] dark:bg-[#2e2d2d] text-gray-900 dark:text-white shadow-2xs font-bold'
+              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200/60 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+          ]"
+        >
+          <Zap class="w-5 h-5" />
+          <span
+            v-if="activeSubNav === 'stun'"
+            class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r bg-gray-700 dark:bg-gray-200"
+          ></span>
+        </button>
+
+        <div class="w-6 border-t border-gray-200 dark:border-[#333232] my-1"></div>
+
+        <!-- 5. 访问控制规则 -->
+        <button
+          type="button"
+          @click="activeSubNav = 'policies'"
+          title="访问控制 (ACL) 策略规则"
+          :class="[
+            'relative w-10 h-10 rounded-lg flex items-center justify-center transition-all cursor-pointer active:scale-95',
+            activeSubNav === 'policies'
+              ? 'bg-[#ebebeb] dark:bg-[#2e2d2d] text-gray-900 dark:text-white shadow-2xs font-bold'
+              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200/60 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+          ]"
+        >
+          <Lock class="w-5 h-5" />
+          <span
+            v-if="activeSubNav === 'policies'"
+            class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r bg-gray-700 dark:bg-gray-200"
+          ></span>
+        </button>
+
+        <!-- 6. 规则测试 -->
+        <button
+          type="button"
+          @click="activeSubNav = 'tests'"
+          title="ACL 规则测试"
+          :class="[
+            'relative w-10 h-10 rounded-lg flex items-center justify-center transition-all cursor-pointer active:scale-95',
+            activeSubNav === 'tests'
+              ? 'bg-[#ebebeb] dark:bg-[#2e2d2d] text-gray-900 dark:text-white shadow-2xs font-bold'
+              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200/60 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+          ]"
+        >
+          <CheckCircle2 class="w-5 h-5" />
+          <span
+            v-if="activeSubNav === 'tests'"
+            class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r bg-gray-700 dark:bg-gray-200"
+          ></span>
+        </button>
+
+        <!-- 7. 配置编辑 (TOML) -->
+        <button
+          type="button"
+          @click="activeSubNav = 'toml'"
+          title="配置编辑 (TOML)"
+          :class="[
+            'relative w-10 h-10 rounded-lg flex items-center justify-center transition-all cursor-pointer active:scale-95',
+            activeSubNav === 'toml'
+              ? 'bg-[#ebebeb] dark:bg-[#2e2d2d] text-gray-900 dark:text-white shadow-2xs font-bold'
+              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200/60 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+          ]"
+        >
+          <Sliders class="w-5 h-5" />
+          <span
+            v-if="activeSubNav === 'toml'"
+            class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r bg-gray-700 dark:bg-gray-200"
+          ></span>
+        </button>
+
+        <div class="w-6 border-t border-gray-200 dark:border-[#333232] my-1"></div>
+
+        <!-- 8. 运行日志 -->
+        <button
+          type="button"
+          @click="activeSubNav = 'logs'"
+          title="运行日志"
+          :class="[
+            'relative w-10 h-10 rounded-lg flex items-center justify-center transition-all cursor-pointer active:scale-95',
+            activeSubNav === 'logs'
+              ? 'bg-[#ebebeb] dark:bg-[#2e2d2d] text-gray-900 dark:text-white shadow-2xs font-bold'
+              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200/60 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+          ]"
+        >
+          <Book class="w-5 h-5" />
+          <span
+            v-if="activeSubNav === 'logs'"
+            class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r bg-gray-700 dark:bg-gray-200"
+          ></span>
+        </button>
+
+        <!-- 9. 网络设置 -->
+        <button
+          type="button"
+          @click="activeSubNav = 'settings'"
+          title="网络设置"
+          :class="[
+            'relative w-10 h-10 rounded-lg flex items-center justify-center transition-all cursor-pointer active:scale-95',
+            activeSubNav === 'settings'
+              ? 'bg-[#ebebeb] dark:bg-[#2e2d2d] text-gray-900 dark:text-white shadow-2xs font-bold'
+              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200/60 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+          ]"
+        >
+          <Settings class="w-5 h-5" />
+          <span
+            v-if="activeSubNav === 'settings'"
+            class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r bg-gray-700 dark:bg-gray-200"
+          ></span>
+        </button>
+
+        <!-- 帮助文档 -->
+        <div class="w-6 border-t border-gray-200 dark:border-[#333232] my-1"></div>
+        <button
+          type="button"
+          @click="showToast('打开 EasyTier 官方技术文档')"
+          title="使用文档"
+          class="w-10 h-10 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200/60 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+        >
+          <BookOpen class="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          @click="showToast('节点连通性排查与延迟探测')"
+          title="故障诊断"
+          class="w-10 h-10 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200/60 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+        >
+          <CircleHelp class="w-4 h-4" />
+        </button>
+      </div>
+
+      <!-- 展开模式下的导航菜单 (桌面展开态或移动端抽屉) -->
+      <div v-else class="flex-1 overflow-y-auto px-2 py-3 space-y-1 text-sm">
+        <!-- 1. 网络总览 (单独作为一级菜单) -->
+        <button
+          type="button"
+          @click="activeSubNav = 'network-overview'; mobileMenuOpen = false"
+          :class="[
+            'relative flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg font-medium text-sm transition-all duration-150 text-left active:scale-[0.98] cursor-pointer group',
+            activeSubNav === 'network-overview'
+              ? 'bg-[#ebebeb] dark:bg-[#2e2d2d] text-gray-900 dark:text-white font-semibold shadow-2xs'
+              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200/60 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+          ]"
+        >
+          <span
+            v-if="activeSubNav === 'network-overview'"
+            class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r bg-blue-600 dark:bg-blue-400"
+          ></span>
+          <Activity
+            :class="[
+              'w-4 h-4 shrink-0 transition-colors',
+              activeSubNav === 'network-overview' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400 group-hover:text-blue-500'
+            ]"
+          />
+          <span class="truncate">网络总览</span>
+          <span class="ml-auto text-[10px] px-1.5 py-0.5 rounded-full font-mono bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-900/60">
+            全览
+          </span>
+        </button>
+
+        <!-- 分割间距 -->
+        <div class="my-1 border-t border-gray-200/60 dark:border-[#2a2929]"></div>
+
+        <!-- 2. 网络与节点分组 -->
         <div>
           <button
             type="button"
@@ -645,36 +926,16 @@ const runAllTests = () => {
             <ChevronRight v-else class="w-3.5 h-3.5 text-gray-400" />
           </button>
 
-          <!-- 网络与节点子项 (精准对齐树形连线与药丸指示条) -->
+          <!-- 网络与节点子项 (树形连线) -->
           <div v-show="isNetworkOpen" class="relative py-0.5 space-y-0.5 ml-2">
-            <!-- 纵向树形连线：固定在 left-[15px] -->
             <div class="absolute left-[15px] top-1 bottom-1 w-[1.5px] bg-gray-200 dark:bg-[#333232]"></div>
-
-            <!-- 网络总览 (网络为中心) -->
-            <button
-              type="button"
-              @click="activeSubNav = 'network-overview'; mobileMenuOpen = false"
-              :class="[
-                'relative flex items-center w-full pl-7 pr-2.5 py-1.5 rounded-md text-sm transition-all duration-100 text-left active:scale-[0.98] cursor-pointer',
-                activeSubNav === 'network-overview'
-                  ? 'bg-[#ebebeb] dark:bg-[#2e2d2d] text-gray-900 dark:text-white font-medium'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#282727] hover:text-gray-900 dark:hover:text-white'
-              ]"
-            >
-              <!-- 深色药丸指示条：宽 3px，放置在 left-[14px]，完美覆盖并咬合在 left-[15px] 的连线上！ -->
-              <span
-                v-if="activeSubNav === 'network-overview'"
-                class="absolute left-[14px] top-1/2 -translate-y-1/2 w-[3px] h-[16px] rounded-full bg-gray-700 dark:bg-gray-200 z-10"
-              ></span>
-              <span>网络总览</span>
-            </button>
 
             <!-- 设备节点 -->
             <button
               type="button"
               @click="activeSubNav = 'machines'; mobileMenuOpen = false"
               :class="[
-                'relative flex items-center w-full pl-7 pr-2.5 py-1.5 rounded-md text-sm transition-all duration-100 text-left active:scale-[0.98] cursor-pointer',
+                'relative flex items-center justify-between w-full pl-7 pr-2.5 py-1.5 rounded-md text-sm transition-all duration-100 text-left active:scale-[0.98] cursor-pointer',
                 activeSubNav === 'machines'
                   ? 'bg-[#ebebeb] dark:bg-[#2e2d2d] text-gray-900 dark:text-white font-medium'
                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#282727] hover:text-gray-900 dark:hover:text-white'
@@ -685,6 +946,7 @@ const runAllTests = () => {
                 class="absolute left-[14px] top-1/2 -translate-y-1/2 w-[3px] h-[16px] rounded-full bg-gray-700 dark:bg-gray-200 z-10"
               ></span>
               <span>设备节点</span>
+              <span class="text-[11px] font-mono text-gray-400">{{ nodes.length }}</span>
             </button>
 
             <!-- 子网路由 -->
@@ -725,7 +987,7 @@ const runAllTests = () => {
           </div>
         </div>
 
-        <!-- 2. 访问控制与策略分组 -->
+        <!-- 3. 访问控制 (ACL) 分组 -->
         <div>
           <button
             type="button"
@@ -740,11 +1002,10 @@ const runAllTests = () => {
             <ChevronRight v-else class="w-3.5 h-3.5 text-gray-400" />
           </button>
 
-          <!-- 访问控制子项 (精准对齐树形连线) -->
+          <!-- 访问控制子项 -->
           <div v-show="isAccessControlsOpen" class="relative py-0.5 space-y-0.5 ml-2">
             <div class="absolute left-[15px] top-1 bottom-1 w-[1.5px] bg-gray-200 dark:bg-[#333232]"></div>
 
-            <!-- 策略规则 -->
             <button
               type="button"
               @click="activeSubNav = 'policies'; mobileMenuOpen = false"
@@ -762,7 +1023,6 @@ const runAllTests = () => {
               <span>策略规则</span>
             </button>
 
-            <!-- 规则测试 -->
             <button
               type="button"
               @click="activeSubNav = 'tests'; mobileMenuOpen = false"
@@ -780,7 +1040,6 @@ const runAllTests = () => {
               <span>规则测试</span>
             </button>
 
-            <!-- TOML 配置生成 -->
             <button
               type="button"
               @click="activeSubNav = 'toml'; mobileMenuOpen = false"
@@ -800,7 +1059,7 @@ const runAllTests = () => {
           </div>
         </div>
 
-        <!-- 3. 运行日志 -->
+        <!-- 4. 运行日志 -->
         <button
           type="button"
           @click="activeSubNav = 'logs'; mobileMenuOpen = false"
@@ -815,7 +1074,7 @@ const runAllTests = () => {
           <span>运行日志</span>
         </button>
 
-        <!-- 4. 网络设置 -->
+        <!-- 5. 网络设置 -->
         <button
           type="button"
           @click="activeSubNav = 'settings'; mobileMenuOpen = false"
@@ -851,17 +1110,36 @@ const runAllTests = () => {
         </div>
       </div>
 
-      <!-- 用户账号条 -->
-      <div class="p-2 border-t border-gray-200 dark:border-[#2f2e2e]">
+      <!-- 底部展开/收起切换与用户账号条 -->
+      <div class="p-2 border-t border-gray-200 dark:border-[#2f2e2e] space-y-1">
+        <!-- 切换折叠/展开按钮 (桌面端) -->
+        <button
+          type="button"
+          @click="toggleSidebar"
+          :class="[
+            'hidden lg:flex items-center text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200/60 dark:hover:bg-gray-800 rounded-md transition-colors cursor-pointer',
+            isSidebarCollapsed ? 'w-10 h-10 mx-auto justify-center' : 'w-full px-2.5 py-1.5 gap-2.5 text-xs'
+          ]"
+          :title="isSidebarCollapsed ? '展开侧边栏' : '收起侧边栏 (仅保留图标)'"
+        >
+          <component :is="isSidebarCollapsed ? PanelLeftOpen : PanelLeftClose" class="w-4 h-4 shrink-0" />
+          <span v-if="!isSidebarCollapsed">收起侧边栏</span>
+        </button>
+
+        <!-- 用户身份条 -->
         <button
           type="button"
           @click="showToast('当前登录身份：网络管理员 (Administrator)')"
-          class="flex items-center gap-2.5 w-full px-2 py-1.5 rounded-md text-left hover:bg-gray-200/60 dark:hover:bg-gray-800 active:scale-[0.98] transition-all"
+          :class="[
+            'flex items-center hover:bg-gray-200/60 dark:hover:bg-gray-800 active:scale-[0.98] transition-all rounded-md cursor-pointer',
+            isSidebarCollapsed ? 'w-10 h-10 mx-auto justify-center p-0' : 'w-full px-2 py-1.5 gap-2.5 text-left'
+          ]"
+          :title="`网络管理员 (admin@easytier.local)`"
         >
           <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-white text-xs select-none shrink-0 bg-blue-600 dark:bg-blue-500">
             管
           </div>
-          <div class="flex flex-col min-w-0 flex-1 leading-tight">
+          <div v-if="!isSidebarCollapsed" class="flex flex-col min-w-0 flex-1 leading-tight">
             <span class="truncate text-xs font-semibold text-gray-900 dark:text-white">网络管理员</span>
             <span class="truncate text-[11px] text-gray-500 dark:text-gray-400 font-mono">admin@easytier.local</span>
           </div>
@@ -876,22 +1154,27 @@ const runAllTests = () => {
       class="lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-2xs"
     ></div>
 
-    <!-- ==================== 右侧主内容区域 ==================== -->
-    <div class="flex-1 min-w-0 lg:pl-60 pt-14 lg:pt-0">
+    <!-- ==================== 右侧主内容区域 (随侧边栏折叠动态拓展) ==================== -->
+    <div
+      :class="[
+        'flex-1 min-w-0 pt-14 lg:pt-0 transition-all duration-200 ease-in-out',
+        isSidebarCollapsed ? 'lg:pl-16' : 'lg:pl-60'
+      ]"
+    >
       
-      <!-- -------------------- 视图 1: 网络总览 (按照“网络为中心”管理) -------------------- -->
-      <main v-if="activeSubNav === 'network-overview'" class="w-full mx-auto pb-20 pt-6 px-4 sm:px-8 lg:px-10 max-w-6xl space-y-6">
-        <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-gray-200 dark:border-[#2f2e2e]">
+      <!-- -------------------- 视图 1: 网络总览 (大画幅全屏宽跨度全景) -------------------- -->
+      <main v-if="activeSubNav === 'network-overview'" class="w-full pb-16 pt-5 px-4 sm:px-6 lg:px-8 space-y-5 min-w-0">
+        <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-200 dark:border-[#2f2e2e]">
           <div>
             <div class="flex items-center gap-3">
-              <h1 class="text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">
+              <h1 class="text-2xl sm:text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">
                 网络总览
               </h1>
-              <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                 主控虚拟网：{{ currentNetwork.name }}
               </span>
             </div>
-            <p class="mt-1.5 text-sm text-gray-600 dark:text-gray-400 max-w-xl">
+            <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
               查看当前虚拟局域网的全局拓扑、网段划分、接入秘钥与互联运行健康度。
             </p>
           </div>
@@ -918,7 +1201,7 @@ const runAllTests = () => {
         </header>
 
         <!-- 当前网络核心关键参数卡片 -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5">
           <div class="p-4 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] space-y-1 shadow-2xs">
             <span class="text-xs text-gray-500">虚拟 IPv4 广播网段</span>
             <div class="text-base font-bold font-mono text-gray-900 dark:text-white">{{ currentNetwork.ipv4Cidr }}</div>
@@ -950,8 +1233,8 @@ const runAllTests = () => {
           </div>
         </div>
 
-        <!-- 当前网络下的网络拓扑与数字地球全景总览 (复刻参考图) -->
-        <div class="space-y-4 pt-2">
+        <!-- 当前网络下的网络拓扑与数字地球全景总览 -->
+        <div class="space-y-3.5 pt-1">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <div class="text-[11px] font-mono font-bold text-gray-400 uppercase tracking-wider">
@@ -961,11 +1244,11 @@ const runAllTests = () => {
                 节点与连接
               </h2>
               <p class="text-xs text-gray-500 dark:text-gray-400">
-                查看直连、中继和公共服务器状态。
+                查看全网直连与中继链路状态。支持网络拓扑与全球 3D 地球仪全览。
               </p>
             </div>
 
-            <!-- 分段视图切换标签: 网络拓扑 / 3D地球仪 / 节点列表 (参考图右上角模式) -->
+            <!-- 分段视图切换标签: 网络拓扑 / 3D地球仪 / 双图同屏 / 节点列表 -->
             <div class="flex items-center p-1 rounded-xl bg-gray-200/70 dark:bg-gray-800 text-xs font-medium">
               <button
                 type="button"
@@ -995,6 +1278,19 @@ const runAllTests = () => {
               </button>
               <button
                 type="button"
+                @click="overviewViewTab = 'split'"
+                :class="[
+                  'px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer font-semibold',
+                  overviewViewTab === 'split'
+                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-2xs'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                ]"
+              >
+                <Layers class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                <span>双图同屏</span>
+              </button>
+              <button
+                type="button"
                 @click="activeSubNav = 'machines'"
                 class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all cursor-pointer"
               >
@@ -1004,8 +1300,8 @@ const runAllTests = () => {
             </div>
           </div>
 
-          <!-- A. 网络拓扑形式 (完全参照参考图，默认展示) -->
-          <div v-if="overviewViewTab === 'topology'">
+          <!-- A. 网络拓扑单图铺满 -->
+          <div v-if="overviewViewTab === 'topology'" class="w-full">
             <NetworkTopology
               :network-name="currentNetwork.name"
               :is-dark="isDark"
@@ -1013,8 +1309,18 @@ const runAllTests = () => {
             />
           </div>
 
-          <!-- B. 3D 球形数字空间形式 -->
-          <div v-else>
+          <!-- B. 3D 球形数字空间单图铺满 -->
+          <div v-else-if="overviewViewTab === 'globe'" class="w-full">
+            <GlobeMap :devices="globeDevices" :is-dark="isDark" @select-device="openDrawer" />
+          </div>
+
+          <!-- C. 双图同屏左右并排铺满 (宽屏分栏) -->
+          <div v-else-if="overviewViewTab === 'split'" class="grid grid-cols-1 xl:grid-cols-2 gap-4 w-full">
+            <NetworkTopology
+              :network-name="currentNetwork.name"
+              :is-dark="isDark"
+              @select-node="openDrawer"
+            />
             <GlobeMap :devices="globeDevices" :is-dark="isDark" @select-device="openDrawer" />
           </div>
         </div>

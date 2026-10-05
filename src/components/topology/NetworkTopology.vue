@@ -54,10 +54,12 @@ const props = withDefaults(
     networkName?: string
     nodes?: any[]
     isDark?: boolean
+    heightClass?: string
   }>(),
   {
     networkName: 'default-mesh',
     isDark: false,
+    heightClass: '',
   }
 )
 
@@ -357,7 +359,13 @@ const startDragNode = (node: TopologyNode, e: MouseEvent) => {
 // 居中自适应
 const fitView = () => {
   zoom.value = 1.0
-  panX.value = 40
+  if (containerRef.value) {
+    // 拓扑树宽度范围大约 180px ~ 800px，中心约为 490px
+    const width = containerRef.value.clientWidth
+    panX.value = Math.max(20, Math.floor(width / 2 - 490))
+  } else {
+    panX.value = 40
+  }
   panY.value = 20
 }
 
@@ -380,12 +388,27 @@ const handleSelectNode = (node: TopologyNode) => {
   emit('select-node', node)
 }
 
+let resizeObserver: ResizeObserver | null = null
+
 onMounted(() => {
   window.addEventListener('mouseup', handleMouseUp)
+  fitView()
+  if (containerRef.value && typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(() => {
+      if (!isPanning.value && !draggingNodeId.value) {
+        fitView()
+      }
+    })
+    resizeObserver.observe(containerRef.value)
+  }
 })
 
 onUnmounted(() => {
   window.removeEventListener('mouseup', handleMouseUp)
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
+  }
 })
 </script>
 
@@ -438,7 +461,7 @@ onUnmounted(() => {
         @wheel="handleWheel"
         :class="[
           'relative w-full overflow-hidden cursor-grab active:cursor-grabbing bg-[#fafbfc] dark:bg-[#121927]',
-          isFullscreen ? 'h-[calc(100vh-140px)]' : 'h-[600px]',
+          isFullscreen ? 'h-[calc(100vh-140px)]' : (heightClass || 'h-[calc(100vh-270px)] min-h-[640px]'),
         ]"
       >
         <!-- 背景微点阵图纹 (高科技通透质感) -->
