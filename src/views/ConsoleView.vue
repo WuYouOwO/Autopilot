@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import {
   Network,
   Users,
@@ -22,17 +23,17 @@ import {
   ArrowUpRight,
   ShieldCheck,
   CheckCircle2,
-  XCircle,
-  AlertCircle,
-  FileCode,
+  Menu,
 } from 'lucide-vue-next'
 
-// --- 导航状态定义 (精准复刻 Tailscale 侧边栏按钮交互) ---
-// 默认激活项设为 'tests'，与您提供的截图 100% 对齐
+// --- 导航状态定义 (Tailscale 侧边栏树形按钮规范) ---
 type SubNavItem = 'machines' | 'apps' | 'services' | 'dns' | 'users' | 'policies' | 'tests' | 'definitions' | 'json-editor' | 'logs' | 'settings'
-const activeSubNav = ref<SubNavItem>('tests')
+const activeSubNav = ref<SubNavItem>('machines')
 
-// 折叠组状态
+// 移动端菜单抽屉
+const mobileMenuOpen = ref(false)
+
+// 折叠组状态 (默认全展开，便于查看)
 const isNetworkOpen = ref(true)
 const isAccessControlsOpen = ref(true)
 const isLogsOpen = ref(false)
@@ -58,7 +59,7 @@ const copyText = (text: string, label: string) => {
   }, 1800)
 }
 
-// --- ACL Tests 模块状态 (当 activeSubNav === 'tests' 时呈现) ---
+// --- ACL Tests 模块状态 ---
 const aclTests = ref([
   {
     id: 'test-1',
@@ -112,7 +113,7 @@ const runAllTests = () => {
   }, 800)
 }
 
-// --- Machines 列表状态 (当 activeSubNav === 'machines' 时呈现) ---
+// --- Machines 列表状态 ---
 const isBannerMinimized = ref(false)
 const showAddDeviceModal = ref(false)
 const selectedOs = ref<'linux' | 'macos' | 'windows' | 'docker'>('linux')
@@ -287,13 +288,33 @@ const addNewMockDevice = () => {
 <template>
   <div class="relative z-0 min-h-screen bg-[#fafafa] dark:bg-[#1f1e1e] text-gray-900 dark:text-gray-100 flex font-sans transition-colors duration-150">
     
-    <!-- ==================== 左侧固定导航栏 (1:1 还原截图结构与按钮样式) ==================== -->
-    <aside class="hidden lg:flex flex-col fixed top-16 bottom-0 left-0 w-60 border-r border-gray-200 dark:border-[#2f2e2e] bg-[#f9fafb] dark:bg-[#1f1e1e] z-30 select-none">
-      
-      <!-- 组织网络标题栏 (截图顶部: ::: seelcmo.org  [Free]) -->
+    <!-- ==================== 移动端顶部标题栏 ==================== -->
+    <header class="lg:hidden fixed top-0 inset-x-0 z-40 h-14 flex items-center justify-between px-4 border-b border-gray-200 dark:border-[#2f2e2e] bg-[#f9fafb] dark:bg-[#1f1e1e]">
+      <div class="flex items-center gap-2.5">
+        <button
+          type="button"
+          @click="mobileMenuOpen = !mobileMenuOpen"
+          class="p-1.5 rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800"
+          aria-label="Open menu"
+        >
+          <Menu class="w-5 h-5" />
+        </button>
+        <span class="font-semibold text-sm">seelcmo.org</span>
+      </div>
+      <ThemeToggle />
+    </header>
+
+    <!-- ==================== 左侧固定导航栏 (Tailscale 1:1 结构) ==================== -->
+    <aside
+      :class="[
+        'fixed top-0 bottom-0 left-0 w-60 border-r border-gray-200 dark:border-[#2f2e2e] bg-[#f9fafb] dark:bg-[#1f1e1e] z-50 select-none flex flex-col transition-transform duration-200 lg:translate-x-0',
+        mobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
+      ]"
+    >
+      <!-- 组织网络标题栏 (::: seelcmo.org  [Free]) -->
       <div class="h-14 px-3 border-b border-gray-200 dark:border-[#2f2e2e] flex items-center justify-between">
         <a href="javascript:void(0)" class="flex items-center min-w-0 gap-2.5 hover:opacity-80 transition-opacity">
-          <!-- Tailscale 经典 3x3 九宫格 Dot Matrix 图标 -->
+          <!-- Tailscale 3x3 九宫格 Dot Matrix 图标 -->
           <svg width="18" height="18" viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg" class="shrink-0 text-gray-900 dark:text-white" aria-hidden="true">
             <circle opacity="0.25" cx="3.4" cy="3.25" r="2.7" fill="currentColor"></circle>
             <circle cx="3.4" cy="11.3" r="2.7" fill="currentColor"></circle>
@@ -307,17 +328,25 @@ const addNewMockDevice = () => {
           </svg>
           <span class="font-semibold text-sm truncate text-gray-900 dark:text-gray-100">seelcmo.org</span>
         </a>
-        <span class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium border border-gray-200 dark:border-transparent bg-gray-200/80 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded">
-          Free
-        </span>
+        <div class="flex items-center gap-1.5">
+          <span class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium border border-gray-200 dark:border-transparent bg-gray-200/80 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded">
+            Free
+          </span>
+          <button
+            type="button"
+            @click="mobileMenuOpen = false"
+            class="lg:hidden p-1 text-gray-400 hover:text-gray-600"
+          >
+            <X class="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
-      <!-- 导航列表项 (精确模拟按钮、悬浮层、层级树引导线与选中指示暗条) -->
+      <!-- 导航列表项 (层级树引导线 + 选中指示暗条) -->
       <div class="flex-1 overflow-y-auto px-2 py-3 space-y-0.5 text-sm">
         
         <!-- 1. Network 分组 -->
         <div>
-          <!-- 一级组按钮 (Tailscale 按钮风格: rounded-md, text-sm, 悬浮轻灰底, 点击微缩) -->
           <button
             type="button"
             @click="isNetworkOpen = !isNetworkOpen"
@@ -327,20 +356,18 @@ const addNewMockDevice = () => {
               <Network class="w-4 h-4 text-gray-700 dark:text-gray-300" />
               <span>Network</span>
             </div>
-            <!-- 截图特征: 展开时显示向下箭头 chevron-down, 收起时显示右箭头 chevron-right -->
             <ChevronDown v-if="isNetworkOpen" class="w-3.5 h-3.5 text-gray-400" />
             <ChevronRight v-else class="w-3.5 h-3.5 text-gray-400" />
           </button>
 
           <!-- Network 子级菜单 (树形引导线 + 按钮项) -->
           <div v-show="isNetworkOpen" class="relative pl-6 py-0.5 space-y-0.5">
-            <!-- 树状纵向连线 (灰色细线，贯穿子项) -->
             <div class="absolute left-[21px] top-1 bottom-1 w-[1px] bg-gray-200 dark:bg-[#333232]"></div>
 
             <!-- Machines -->
             <button
               type="button"
-              @click="activeSubNav = 'machines'"
+              @click="activeSubNav = 'machines'; mobileMenuOpen = false"
               :class="[
                 'relative flex items-center w-full pl-6 pr-2.5 py-1.5 rounded-md text-sm transition-all duration-100 text-left active:scale-[0.98] cursor-pointer',
                 activeSubNav === 'machines'
@@ -348,7 +375,6 @@ const addNewMockDevice = () => {
                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#282727] hover:text-gray-900 dark:hover:text-white'
               ]"
             >
-              <!-- 截图核心细节: 选中时在垂直线上对齐的深色圆角药丸指示条 -->
               <span
                 v-if="activeSubNav === 'machines'"
                 class="absolute left-[20px] top-1/2 -translate-y-1/2 w-[3px] h-[16px] rounded-full bg-gray-700 dark:bg-gray-200"
@@ -359,7 +385,7 @@ const addNewMockDevice = () => {
             <!-- Apps -->
             <button
               type="button"
-              @click="activeSubNav = 'apps'; showToast('切换至 Apps 应用连接网关')"
+              @click="activeSubNav = 'apps'; showToast('切换至 Apps 应用连接网关'); mobileMenuOpen = false"
               :class="[
                 'relative flex items-center w-full pl-6 pr-2.5 py-1.5 rounded-md text-sm transition-all duration-100 text-left active:scale-[0.98] cursor-pointer',
                 activeSubNav === 'apps'
@@ -377,7 +403,7 @@ const addNewMockDevice = () => {
             <!-- Services -->
             <button
               type="button"
-              @click="activeSubNav = 'services'; showToast('切换至 Services 网络服务列表')"
+              @click="activeSubNav = 'services'; showToast('切换至 Services 网络服务列表'); mobileMenuOpen = false"
               :class="[
                 'relative flex items-center w-full pl-6 pr-2.5 py-1.5 rounded-md text-sm transition-all duration-100 text-left active:scale-[0.98] cursor-pointer',
                 activeSubNav === 'services'
@@ -395,7 +421,7 @@ const addNewMockDevice = () => {
             <!-- DNS -->
             <button
               type="button"
-              @click="activeSubNav = 'dns'; showToast('切换至 MagicDNS 域名配置')"
+              @click="activeSubNav = 'dns'; showToast('切换至 MagicDNS 域名配置'); mobileMenuOpen = false"
               :class="[
                 'relative flex items-center w-full pl-6 pr-2.5 py-1.5 rounded-md text-sm transition-all duration-100 text-left active:scale-[0.98] cursor-pointer',
                 activeSubNav === 'dns'
@@ -412,10 +438,10 @@ const addNewMockDevice = () => {
           </div>
         </div>
 
-        <!-- 2. Users (截图特征: 无折叠箭头的一级链接按钮) -->
+        <!-- 2. Users -->
         <button
           type="button"
-          @click="activeSubNav = 'users'; showToast('切换至 Users 用户管理')"
+          @click="activeSubNav = 'users'; showToast('切换至 Users 用户管理'); mobileMenuOpen = false"
           :class="[
             'flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-md font-normal transition-all duration-100 active:scale-[0.98] cursor-pointer text-left',
             activeSubNav === 'users'
@@ -427,9 +453,8 @@ const addNewMockDevice = () => {
           <span>Users</span>
         </button>
 
-        <!-- 3. Access controls 分组 (截图核心聚焦区域：包含 Tests 激活态) -->
+        <!-- 3. Access controls 分组 -->
         <div>
-          <!-- Access controls 一级按钮 -->
           <button
             type="button"
             @click="isAccessControlsOpen = !isAccessControlsOpen"
@@ -439,20 +464,18 @@ const addNewMockDevice = () => {
               <Lock class="w-4 h-4 text-gray-700 dark:text-gray-300" />
               <span>Access controls</span>
             </div>
-            <!-- 截图特征: 展开时为向下箭头 chevron-down -->
             <ChevronDown v-if="isAccessControlsOpen" class="w-3.5 h-3.5 text-gray-400" />
             <ChevronRight v-else class="w-3.5 h-3.5 text-gray-400" />
           </button>
 
           <!-- Access controls 子级菜单 -->
           <div v-show="isAccessControlsOpen" class="relative pl-6 py-0.5 space-y-0.5">
-            <!-- 树状纵向连线 -->
             <div class="absolute left-[21px] top-1 bottom-1 w-[1px] bg-gray-200 dark:bg-[#333232]"></div>
 
             <!-- Policies -->
             <button
               type="button"
-              @click="activeSubNav = 'policies'; showToast('切换至 ACL Policies 策略规则')"
+              @click="activeSubNav = 'policies'; showToast('切换至 ACL Policies 策略规则'); mobileMenuOpen = false"
               :class="[
                 'relative flex items-center w-full pl-6 pr-2.5 py-1.5 rounded-md text-sm transition-all duration-100 text-left active:scale-[0.98] cursor-pointer',
                 activeSubNav === 'policies'
@@ -467,10 +490,10 @@ const addNewMockDevice = () => {
               <span>Policies</span>
             </button>
 
-            <!-- Tests (截图中的高亮选中按钮！) -->
+            <!-- Tests -->
             <button
               type="button"
-              @click="activeSubNav = 'tests'"
+              @click="activeSubNav = 'tests'; mobileMenuOpen = false"
               :class="[
                 'relative flex items-center w-full pl-6 pr-2.5 py-1.5 rounded-md text-sm transition-all duration-100 text-left active:scale-[0.98] cursor-pointer',
                 activeSubNav === 'tests'
@@ -478,7 +501,6 @@ const addNewMockDevice = () => {
                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#282727] hover:text-gray-900 dark:hover:text-white'
               ]"
             >
-              <!-- 1:1 还原截图：深色立柱药丸指示标记 -->
               <span
                 v-if="activeSubNav === 'tests'"
                 class="absolute left-[20px] top-1/2 -translate-y-1/2 w-[3px] h-[16px] rounded-full bg-gray-700 dark:bg-gray-200"
@@ -489,7 +511,7 @@ const addNewMockDevice = () => {
             <!-- Definitions -->
             <button
               type="button"
-              @click="activeSubNav = 'definitions'; showToast('切换至 Definitions 别名与标签定义')"
+              @click="activeSubNav = 'definitions'; showToast('切换至 Definitions 别名与标签定义'); mobileMenuOpen = false"
               :class="[
                 'relative flex items-center w-full pl-6 pr-2.5 py-1.5 rounded-md text-sm transition-all duration-100 text-left active:scale-[0.98] cursor-pointer',
                 activeSubNav === 'definitions'
@@ -507,7 +529,7 @@ const addNewMockDevice = () => {
             <!-- JSON editor -->
             <button
               type="button"
-              @click="activeSubNav = 'json-editor'; showToast('切换至 JSON 策略代码编辑器')"
+              @click="activeSubNav = 'json-editor'; showToast('切换至 JSON 策略代码编辑器'); mobileMenuOpen = false"
               :class="[
                 'relative flex items-center w-full pl-6 pr-2.5 py-1.5 rounded-md text-sm transition-all duration-100 text-left active:scale-[0.98] cursor-pointer',
                 activeSubNav === 'json-editor'
@@ -524,7 +546,7 @@ const addNewMockDevice = () => {
           </div>
         </div>
 
-        <!-- 4. Logs (截图特征: 右箭头 chevron-right 折叠态按钮) -->
+        <!-- 4. Logs -->
         <button
           type="button"
           @click="isLogsOpen = !isLogsOpen; showToast('展开/收起 Logs 审计流转')"
@@ -537,7 +559,7 @@ const addNewMockDevice = () => {
           <ChevronRight class="w-3.5 h-3.5 text-gray-400" />
         </button>
 
-        <!-- 5. Settings (截图特征: 右箭头 chevron-right 折叠态按钮) -->
+        <!-- 5. Settings -->
         <button
           type="button"
           @click="isSettingsOpen = !isSettingsOpen; showToast('展开/收起 Settings 网络配置')"
@@ -589,28 +611,16 @@ const addNewMockDevice = () => {
       </div>
     </aside>
 
-    <!-- ==================== 右侧主内容区域 ==================== -->
-    <div class="flex-1 min-w-0 lg:pl-60">
-      
-      <!-- 风格演示状态提醒条 -->
-      <div class="bg-blue-50/90 dark:bg-blue-950/40 border-b border-blue-200/60 dark:border-blue-900/50 py-2.5 px-4 sm:px-8 text-xs text-blue-900 dark:text-blue-200 flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
-          <span>
-            当前展示：<strong>Tailscale 导航按钮风格</strong>（支持点击左侧 <code class="px-1 py-0.5 rounded bg-blue-100 dark:bg-blue-900 text-[11px]">Tests</code> 与 <code class="px-1 py-0.5 rounded bg-blue-100 dark:bg-blue-900 text-[11px]">Machines</code> 体验树形连线与深色圆角药丸指示条）。
-          </span>
-        </div>
-        <div class="flex items-center gap-2">
-          <button
-            type="button"
-            @click="activeSubNav = activeSubNav === 'tests' ? 'machines' : 'tests'"
-            class="px-2.5 py-1 rounded bg-white dark:bg-gray-800 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-medium hover:bg-blue-50 dark:hover:bg-gray-700 active:scale-[0.98] transition-all"
-          >
-            一键切换为 {{ activeSubNav === 'tests' ? 'Machines 设备管理' : 'Tests 规则测试' }}
-          </button>
-        </div>
-      </div>
+    <!-- 移动端遮罩层 -->
+    <div
+      v-if="mobileMenuOpen"
+      @click="mobileMenuOpen = false"
+      class="lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-2xs"
+    ></div>
 
+    <!-- ==================== 右侧主内容区域 ==================== -->
+    <div class="flex-1 min-w-0 lg:pl-60 pt-14 lg:pt-0">
+      
       <!-- -------------------- 视图 A: 当 activeSubNav === 'tests' 时呈现 (ACL 规则测试) -------------------- -->
       <main v-if="activeSubNav === 'tests'" class="w-full mx-auto pb-20 pt-6 px-4 sm:px-8 lg:px-10 max-w-6xl">
         <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-gray-200 dark:border-[#2f2e2e]">
@@ -628,8 +638,8 @@ const addNewMockDevice = () => {
             </p>
           </div>
 
-          <!-- Tailscale 经典按钮组: 幽灵按钮/次级按钮 + 蓝色主要按钮 (带 active:scale 缩放微动效) -->
           <div class="flex items-center gap-2.5">
+            <ThemeToggle class="hidden sm:inline-flex" />
             <button
               @click="runAllTests"
               type="button"
@@ -720,8 +730,6 @@ const addNewMockDevice = () => {
 
       <!-- -------------------- 视图 B: 当 activeSubNav === 'machines' 时呈现 (Machines 设备管理) -------------------- -->
       <main v-else class="w-full mx-auto pb-20 pt-6 px-4 sm:px-8 lg:px-10 max-w-6xl">
-        
-        <!-- 页面标题 & 动作按钮 -->
         <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6">
           <div>
             <div class="flex items-center gap-3">
@@ -746,8 +754,9 @@ const addNewMockDevice = () => {
             </p>
           </div>
 
-          <!-- 右侧 Add device 按钮 (Tailscale 标志性蓝色按钮带小箭头，带 active:scale 微缩反馈) -->
-          <div class="flex items-center gap-2">
+          <!-- 右侧 Add device 按钮与主题切换 -->
+          <div class="flex items-center gap-2.5">
+            <ThemeToggle class="hidden sm:inline-flex" />
             <button
               @click="showAddDeviceModal = true"
               type="button"
@@ -1055,7 +1064,7 @@ const addNewMockDevice = () => {
       </main>
     </div>
 
-    <!-- ==================== 右侧机器详情抽屉 (Slide-over Drawer) ==================== -->
+    <!-- ==================== 右侧机器详情抽屉 ==================== -->
     <div
       v-if="drawerOpen"
       class="fixed inset-0 z-50 overflow-hidden bg-black/40 backdrop-blur-xs flex justify-end transition-opacity"

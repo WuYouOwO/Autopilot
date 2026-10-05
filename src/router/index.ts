@@ -1,13 +1,11 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
-import AppLayout from '@/components/layout/AppLayout.vue'
 
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    name: 'Showcase',
-    component: () => import('@/views/showcase/StylePicker.vue'),
-    meta: { public: true, title: 'UI 风格选型实验室' },
+    name: 'Console',
+    component: () => import('@/views/ConsoleView.vue'),
+    meta: { public: true, title: 'EasyTier Console' },
   },
   {
     path: '/login',
@@ -27,6 +25,9 @@ export const router = createRouter({
 })
 
 router.beforeEach((to, _from, next) => {
+  if (to.meta.title) {
+    document.title = `${to.meta.title} · EasyTier Autopilot`
+  }
   next()
 })
 
