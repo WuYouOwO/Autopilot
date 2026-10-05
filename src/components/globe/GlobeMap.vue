@@ -1,55 +1,91 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import * as THREE from 'three'
+import * as topojson from 'topojson-client'
+import landTopology from '@/assets/land-110m.json'
 import {
   Globe,
-  Activity,
-  Layers,
-  Zap,
-  Radio,
-  Maximize2,
-  Minimize2,
-  RefreshCw,
+  Compass,
+  Crosshair,
+  Play,
+  Settings,
+  Wifi,
   X,
-  ExternalLink,
   ArrowUpRight,
-  AlertTriangle,
+  Menu,
+  RotateCw,
+  Eye,
+  EyeOff,
 } from 'lucide-vue-next'
-import type { GlobeDevice } from '@/types/globe'
-export type { GlobeDevice } from '@/types/globe'
+export interface GlobeDevice {
+  id: string
+  hostname: string
+  locationName: string
+  countryCode: string
+  publicIp: string
+  ipv4: string
+  ipv6: string
+  lat: number
+  lng: number
+  status: 'online' | 'offline'
+  connection: string
+  latencyMs: number
+  natType: string
+  peers?: string[]
+}
 
-const props = defineProps<{
-  devices: GlobeDevice[]
-  isDark?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    devices: GlobeDevice[]
+    isDark?: boolean
+  }>(),
+  {
+    isDark: false,
+  }
+)
 
 const emit = defineEmits<{
   (e: 'select-device', device: GlobeDevice): void
 }>()
 
-const containerRef = ref<HTMLDivElement | null>(null)
+// 视图模式与控制状态
+const viewMode = ref<'3d' | '2d'>('3d')
+const showDeviceList = ref(false)
+const showLines = ref(true)
+const searchTarget = ref('')
 const selectedDevice = ref<GlobeDevice | null>(null)
 const isRotating = ref(true)
 const webGlError = ref(false)
-const autoRotateSpeed = 0.002
+const isTracing = ref(false)
 
+const containerRef = ref<HTMLDivElement | null>(null)
+const canvas2dRef = ref<HTMLCanvasElement | null>(null)
+
+// Three.js 核心对象
 let scene: THREE.Scene
 let camera: THREE.PerspectiveCamera
 let renderer: THREE.WebGLRenderer
 let globeGroup: THREE.Group
+let linesGroup: THREE.Group
+let markersGroup: THREE.Group
+let pulseSprites: { sprite: THREE.Sprite; baseScale: number }[] = []
 let animationFrameId: number
+
+const RADIUS = 100
+const autoRotateSpeed = 0.0012
 
 // 鼠标交互控制变量
 let isDragging = false
 let previousMousePosition = { x: 0, y: 0 }
-let targetRotation = { x: 0.2, y: 0 }
-let currentRotation = { x: 0.2, y: 0 }
+// 初始角度对准东亚/西太平洋 (如截图所示)
+let targetRotation = { x: 0.32, y: -2.15 }
+let currentRotation = { x: 0.32, y: -2.15 }
 
 const onMouseUp = () => {
   isDragging = false
 }
 
-// 经纬度转 3D 笛卡尔坐标 (半径 R)
+// 经纬度转 3D 笛卡尔坐标
 const latLngToVector3 = (lat: number, lng: number, radius: number): THREE.Vector3 => {
   const phi = (90 - (lat || 0)) * (Math.PI / 180)
   const theta = ((lng || 0) + 180) * (Math.PI / 180)
@@ -61,27 +97,223 @@ const latLngToVector3 = (lat: number, lng: number, radius: number): THREE.Vector
   return new THREE.Vector3(x, y, z)
 }
 
-// 创建大圆弧线 (Great Circle Arc) 空间飞线
-const createCurvedArc = (startVec: THREE.Vector3, endVec: THREE.Vector3, colorHex: number): THREE.Line => {
-  const distance = startVec.distanceTo(endVec)
-  const midPoint = new THREE.Vector3().addVectors(startVec, endVec).multiplyScalar(0.5)
+// 动态生成高清世界陆地与经纬网画布贴图 (实现类似截图中的白净淡蓝极简风格)
+const createEarthTexture = (dark: boolean): THREE.CanvasTexture => {
+  const width = 2048
+  const height = 1024
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')!
 
-  // 根据距离将中点向球心外凸出，形成抛物弧线
-  const altitude = 1 + distance * 0.22
-  midPoint.normalize().multiplyScalar(altitude * 100)
+  // 1. 海洋背景底色 (浅色模式为极淡的冰蓝天色，暗色模式为深空蓝)
+  ctx.fillStyle = dark ? '#0a1220' : '#ebf4fc'
+  ctx.fillRect(0, 0, width, height)
 
-  const curve = new THREE.QuadraticBezierCurve3(startVec, midPoint, endVec)
-  const points = curve.getPoints(50)
+  // 2. 经纬度网格线 (微透天空蓝细线，与截图一致)
+  ctx.strokeStyle = dark ? 'rgba(59, 130, 246, 0.16)' : 'rgba(59, 130, 246, 0.11)'
+  ctx.lineWidth = 1.0
+
+  // 纬线 (每 30 度)
+  for (let lat = -60; lat <= 60; lat += 30) {
+    const y = ((90 - lat) / 180) * height
+    ctx.beginPath()
+    ctx.moveTo(0, y)
+    ctx.lineTo(width, y)
+    ctx.stroke()
+  }
+
+  // 经线 (每 30 度)
+  for (let lng = -180; lng <= 180; lng += 30) {
+    const x = ((lng + 180) / 360) * width
+    ctx.beginPath()
+    ctx.moveTo(x, 0)
+    ctx.lineTo(x, height)
+    ctx.stroke()
+  }
+
+  // 赤道加深高亮
+  ctx.strokeStyle = dark ? 'rgba(59, 130, 246, 0.25)' : 'rgba(59, 130, 246, 0.2)'
+  ctx.beginPath()
+  ctx.moveTo(0, height / 2)
+  ctx.lineTo(width, height / 2)
+  ctx.stroke()
+
+  // 3. 绘制真实世界各大洲陆地多边形 (浅灰填充与清晰灰蓝海岸线轮廓)
+  try {
+    const landGeo = topojson.feature(landTopology as any, (landTopology as any).objects.land) as any
+    const multiPoly = landGeo.features[0].geometry.coordinates
+
+    ctx.fillStyle = dark ? '#152238' : '#e4e9ef'
+    ctx.strokeStyle = dark ? '#283c5a' : '#cbd5e1'
+    ctx.lineWidth = 1.2
+    ctx.lineJoin = 'round'
+
+    for (const poly of multiPoly) {
+      ctx.beginPath()
+      for (const ring of poly) {
+        if (!ring || ring.length === 0) continue
+        for (let i = 0; i < ring.length; i++) {
+          const pt = ring[i]
+          const x = ((pt[0] + 180) / 360) * width
+          const y = ((90 - pt[1]) / 180) * height
+          if (i === 0) ctx.moveTo(x, y)
+          else ctx.lineTo(x, y)
+        }
+      }
+      ctx.fill()
+      ctx.stroke()
+    }
+  } catch (err) {
+    console.warn('陆地数据解析渲染异常:', err)
+  }
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.wrapS = THREE.RepeatWrapping
+  texture.wrapT = THREE.ClampToEdgeWrapping
+  return texture
+}
+
+// 创建节点呼吸发光贴图 (类似截图东京、新加坡蓝热力光晕)
+const createGlowTexture = (isOnline: boolean, dark: boolean): THREE.CanvasTexture => {
+  const canvas = document.createElement('canvas')
+  canvas.width = 128
+  canvas.height = 128
+  const ctx = canvas.getContext('2d')!
+  const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64)
+
+  if (isOnline) {
+    if (dark) {
+      grad.addColorStop(0, 'rgba(56, 189, 248, 1)')
+      grad.addColorStop(0.2, 'rgba(14, 165, 233, 0.85)')
+      grad.addColorStop(0.48, 'rgba(2, 132, 199, 0.35)')
+      grad.addColorStop(0.8, 'rgba(3, 105, 161, 0.1)')
+      grad.addColorStop(1, 'rgba(3, 105, 161, 0)')
+    } else {
+      // 浅色模式：浓郁且泛着光晕的湖蓝/深蓝
+      grad.addColorStop(0, 'rgba(29, 78, 216, 1)')
+      grad.addColorStop(0.22, 'rgba(37, 99, 235, 0.85)')
+      grad.addColorStop(0.48, 'rgba(59, 130, 246, 0.4)')
+      grad.addColorStop(0.78, 'rgba(147, 197, 253, 0.15)')
+      grad.addColorStop(1, 'rgba(219, 234, 254, 0)')
+    }
+  } else {
+    grad.addColorStop(0, 'rgba(148, 163, 184, 0.8)')
+    grad.addColorStop(0.3, 'rgba(203, 213, 225, 0.3)')
+    grad.addColorStop(1, 'rgba(241, 245, 249, 0)')
+  }
+
+  ctx.fillStyle = grad
+  ctx.fillRect(0, 0, 128, 128)
+  return new THREE.CanvasTexture(canvas)
+}
+
+// 创建贴地低空飞线 (满足用户需求：不要搞那种特别高的线！低空贴地仅微凸 1.2%)
+const createLowAltitudeArc = (startVec: THREE.Vector3, endVec: THREE.Vector3, colorHex: number): THREE.Line => {
+  const points: THREE.Vector3[] = []
+  const segments = 48
+  const startNorm = startVec.clone().normalize()
+  const endNorm = endVec.clone().normalize()
+
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments
+    const current = new THREE.Vector3()
+    const omega = Math.acos(Math.max(-1, Math.min(1, startNorm.dot(endNorm))))
+
+    if (omega < 0.001) {
+      current.copy(startNorm)
+    } else {
+      const sinOmega = Math.sin(omega)
+      const w1 = Math.sin((1 - t) * omega) / sinOmega
+      const w2 = Math.sin(t * omega) / sinOmega
+      current.copy(startNorm).multiplyScalar(w1).add(endNorm.clone().multiplyScalar(w2))
+    }
+
+    // 关键：贴地低空控制，中间最高处仅高出表面 1.2% (RADIUS * 1.012)，完全贴合地表弧度
+    const elevation = 1 + Math.sin(t * Math.PI) * 0.012
+    current.normalize().multiplyScalar(RADIUS * elevation)
+    points.push(current)
+  }
+
   const geometry = new THREE.BufferGeometry().setFromPoints(points)
-
   const material = new THREE.LineBasicMaterial({
     color: colorHex,
     transparent: true,
-    opacity: 0.65,
-    linewidth: 1.5,
+    opacity: props.isDark ? 0.65 : 0.45,
+    linewidth: 1.2,
   })
 
   return new THREE.Line(geometry, material)
+}
+
+// 重新构建标记与飞线
+const updateMarkersAndLines = () => {
+  if (!globeGroup || !markersGroup || !linesGroup) return
+
+  // 清理原有标记和飞线
+  while (markersGroup.children.length > 0) {
+    markersGroup.remove(markersGroup.children[0])
+  }
+  while (linesGroup.children.length > 0) {
+    linesGroup.remove(linesGroup.children[0])
+  }
+  pulseSprites = []
+
+  const nodeMarkers: THREE.Mesh[] = []
+  const glowOnlineTex = createGlowTexture(true, props.isDark)
+  const glowOfflineTex = createGlowTexture(false, props.isDark)
+
+  // 1. 添加各个节点的光晕与实体点
+  props.devices.forEach((dev) => {
+    const pos = latLngToVector3(dev.lat, dev.lng, RADIUS + 0.3)
+
+    // A. 柔和呼吸发光光晕 (Sprite 看向相机)
+    const isOnline = dev.status === 'online'
+    const spriteMat = new THREE.SpriteMaterial({
+      map: isOnline ? glowOnlineTex : glowOfflineTex,
+      transparent: true,
+      opacity: isOnline ? (props.isDark ? 0.95 : 0.85) : 0.4,
+      blending: THREE.NormalBlending,
+    })
+    const sprite = new THREE.Sprite(spriteMat)
+    sprite.position.copy(pos.clone().multiplyScalar(1.002))
+    const baseScale = isOnline ? 13 : 8
+    sprite.scale.set(baseScale, baseScale, 1)
+    markersGroup.add(sprite)
+    pulseSprites.push({ sprite, baseScale })
+
+    // B. 中心高清晰实体核心点
+    const coreGeo = new THREE.SphereGeometry(1.6, 16, 16)
+    const coreMat = new THREE.MeshBasicMaterial({
+      color: isOnline ? (props.isDark ? 0x38bdf8 : 0x1d4ed8) : 0x94a3b8,
+    })
+    const coreMesh = new THREE.Mesh(coreGeo, coreMat)
+    coreMesh.position.copy(pos)
+    coreMesh.userData = dev
+    markersGroup.add(coreMesh)
+    nodeMarkers.push(coreMesh)
+  })
+
+  // 2. 添加贴地低空飞线 (若开关开启)
+  if (showLines.value && props.devices.length >= 2) {
+    const hub = props.devices[0]
+    const hubVec = latLngToVector3(hub.lat, hub.lng, RADIUS)
+
+    for (let i = 1; i < props.devices.length; i++) {
+      const peer = props.devices[i]
+      if (peer.status === 'online') {
+        const peerVec = latLngToVector3(peer.lat, peer.lng, RADIUS)
+        const isDirect = peer.connection.includes('直连')
+        const color = isDirect
+          ? (props.isDark ? 0x38bdf8 : 0x2563eb)
+          : (props.isDark ? 0xf59e0b : 0xd97706)
+        const line = createLowAltitudeArc(hubVec, peerVec, color)
+        linesGroup.add(line)
+      }
+    }
+  }
+
+  return nodeMarkers
 }
 
 // 初始化 Three.js 场景
@@ -89,11 +321,11 @@ const initThree = () => {
   if (!containerRef.value) return
   try {
     const width = containerRef.value.clientWidth || 800
-    const height = containerRef.value.clientHeight || 500
+    const height = containerRef.value.clientHeight || 540
 
     scene = new THREE.Scene()
-    camera = new THREE.PerspectiveCamera(45, width / height, 1, 2000)
-    camera.position.z = 280
+    camera = new THREE.PerspectiveCamera(40, width / height, 1, 2000)
+    camera.position.z = 275
 
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
     renderer.setSize(width, height)
@@ -103,103 +335,46 @@ const initThree = () => {
     globeGroup = new THREE.Group()
     scene.add(globeGroup)
 
-  const RADIUS = 100
+    linesGroup = new THREE.Group()
+    markersGroup = new THREE.Group()
 
-  // 1. 核心地球球体
-  const sphereGeo = new THREE.SphereGeometry(RADIUS, 64, 64)
-  const sphereMat = new THREE.MeshPhongMaterial({
-    color: props.isDark ? 0x111b2b : 0xe2e8f0,
-    emissive: props.isDark ? 0x070d19 : 0xf1f5f9,
-    specular: props.isDark ? 0x1e3a8a : 0x93c5fd,
-    shininess: 15,
-    transparent: true,
-    opacity: 0.92,
-    wireframe: false,
-  })
-  const earthMesh = new THREE.Mesh(sphereGeo, sphereMat)
-  globeGroup.add(earthMesh)
-
-  // 2. 经纬线与网格网状线 (Latitude/Longitude Graticule)
-  const wireGeo = new THREE.WireframeGeometry(new THREE.SphereGeometry(RADIUS + 0.2, 24, 24))
-  const wireMat = new THREE.LineBasicMaterial({
-    color: props.isDark ? 0x2563eb : 0x94a3b8,
-    transparent: true,
-    opacity: props.isDark ? 0.15 : 0.2,
-  })
-  const wireMesh = new THREE.LineSegments(wireGeo, wireMat)
-  globeGroup.add(wireMesh)
-
-  // 3. 外部发光大气层光晕 (Atmosphere Glow)
-  const glowGeo = new THREE.SphereGeometry(RADIUS * 1.08, 32, 32)
-  const glowMat = new THREE.MeshBasicMaterial({
-    color: props.isDark ? 0x3b82f6 : 0x60a5fa,
-    transparent: true,
-    opacity: props.isDark ? 0.08 : 0.05,
-    side: THREE.BackSide,
-  })
-  const glowMesh = new THREE.Mesh(glowGeo, glowMat)
-  globeGroup.add(glowMesh)
-
-  // 4. 灯光系统
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.9)
-  scene.add(ambientLight)
-
-  const dirLight1 = new THREE.DirectionalLight(0xffffff, 1.2)
-  dirLight1.position.set(200, 200, 200)
-  scene.add(dirLight1)
-
-  const dirLight2 = new THREE.DirectionalLight(props.isDark ? 0x3b82f6 : 0x93c5fd, 0.8)
-  dirLight2.position.set(-200, -100, -100)
-  scene.add(dirLight2)
-
-  // 5. 添加设备节点标记 (Marker Pins)
-  const nodeMarkers: THREE.Mesh[] = []
-  props.devices.forEach((dev) => {
-    const pos = latLngToVector3(dev.lat, dev.lng, RADIUS + 0.8)
-
-    // 发光圆环或核心点
-    const markerGeo = new THREE.SphereGeometry(2.2, 16, 16)
-    const markerMat = new THREE.MeshBasicMaterial({
-      color: dev.status === 'online' ? 0x10b981 : 0x94a3b8,
+    // 1. 核心地球球体 (贴上真实世界陆地与经纬网画布贴图)
+    const earthTexture = createEarthTexture(props.isDark)
+    const sphereGeo = new THREE.SphereGeometry(RADIUS, 64, 64)
+    const sphereMat = new THREE.MeshStandardMaterial({
+      map: earthTexture,
+      roughness: 0.88,
+      metalness: 0.05,
     })
-    const marker = new THREE.Mesh(markerGeo, markerMat)
-    marker.position.copy(pos)
-    marker.userData = dev
-    globeGroup.add(marker)
-    nodeMarkers.push(marker)
+    const earthMesh = new THREE.Mesh(sphereGeo, sphereMat)
+    globeGroup.add(earthMesh)
 
-    // 外圈光晕立柱
-    const ringGeo = new THREE.RingGeometry(2.5, 4.2, 16)
-    const ringMat = new THREE.MeshBasicMaterial({
-      color: dev.status === 'online' ? 0x34d399 : 0x94a3b8,
-      side: THREE.DoubleSide,
+    globeGroup.add(linesGroup)
+    globeGroup.add(markersGroup)
+
+    // 2. 外部极微弱发光大气层光晕 (如截图中的纯净淡蓝光晕)
+    const glowGeo = new THREE.SphereGeometry(RADIUS * 1.018, 32, 32)
+    const glowMat = new THREE.MeshBasicMaterial({
+      color: props.isDark ? 0x38bdf8 : 0x60a5fa,
       transparent: true,
-      opacity: 0.6,
+      opacity: props.isDark ? 0.08 : 0.04,
+      side: THREE.BackSide,
     })
-    const ring = new THREE.Mesh(ringGeo, ringMat)
-    ring.position.copy(pos.clone().multiplyScalar(1.002))
-    ring.lookAt(new THREE.Vector3(0, 0, 0))
-    globeGroup.add(ring)
-  })
+    const glowMesh = new THREE.Mesh(glowGeo, glowMat)
+    globeGroup.add(glowMesh)
 
-  // 6. 添加 P2P 飞线 (Arcs between nodes)
-  // 以香港核心节点为枢纽，连接东京、上海、硅谷
-  if (props.devices.length >= 2) {
-    const hub = props.devices[0]
-    const hubVec = latLngToVector3(hub.lat, hub.lng, RADIUS)
+    // 3. 灯光系统
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.25)
+    scene.add(ambientLight)
 
-    for (let i = 1; i < props.devices.length; i++) {
-      const peer = props.devices[i]
-      if (peer.status === 'online') {
-        const peerVec = latLngToVector3(peer.lat, peer.lng, RADIUS)
-        const isDirect = peer.connection.includes('直连')
-        const arcLine = createCurvedArc(hubVec, peerVec, isDirect ? 0x10b981 : 0xf59e0b)
-        globeGroup.add(arcLine)
-      }
-    }
-  }
+    const sunLight = new THREE.DirectionalLight(0xffffff, 0.75)
+    sunLight.position.set(150, 180, 200)
+    scene.add(sunLight)
 
-    // 7. 鼠标交互事件监听
+    // 4. 节点与低空飞线
+    const nodeMarkers = updateMarkersAndLines() || []
+
+    // 5. 鼠标与拖拽控制
     const dom = renderer.domElement
 
     dom.addEventListener('mousedown', (e) => {
@@ -212,7 +387,7 @@ const initThree = () => {
 
     dom.addEventListener('mousemove', (e) => {
       if (!isDragging) {
-        // 射线检测鼠标悬浮的节点
+        // 射线检测
         const rect = dom.getBoundingClientRect()
         const mouse = new THREE.Vector2(
           ((e.clientX - rect.left) / width) * 2 - 1,
@@ -221,27 +396,20 @@ const initThree = () => {
         const raycaster = new THREE.Raycaster()
         raycaster.setFromCamera(mouse, camera)
         const intersects = raycaster.intersectObjects(nodeMarkers)
-        if (intersects.length > 0) {
-          dom.style.cursor = 'pointer'
-        } else {
-          dom.style.cursor = 'grab'
-        }
+        dom.style.cursor = intersects.length > 0 ? 'pointer' : 'grab'
         return
       }
 
       const deltaX = e.clientX - previousMousePosition.x
       const deltaY = e.clientY - previousMousePosition.y
 
-      targetRotation.y += deltaX * 0.005
-      targetRotation.x += deltaY * 0.005
-
-      // 限制俯仰角度，避免翻滚
-      targetRotation.x = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, targetRotation.x))
+      targetRotation.y += deltaX * 0.004
+      targetRotation.x += deltaY * 0.004
+      targetRotation.x = Math.max(-Math.PI / 2.3, Math.min(Math.PI / 2.3, targetRotation.x))
 
       previousMousePosition = { x: e.clientX, y: e.clientY }
     })
 
-    // 点击选择节点
     dom.addEventListener('click', (e) => {
       const rect = dom.getBoundingClientRect()
       const mouse = new THREE.Vector2(
@@ -258,22 +426,22 @@ const initThree = () => {
       }
     })
 
-    // 滚轮缩放控制
     dom.addEventListener(
       'wheel',
       (e) => {
         e.preventDefault()
-        camera.position.z += e.deltaY * 0.15
-        camera.position.z = Math.max(180, Math.min(450, camera.position.z))
+        camera.position.z += e.deltaY * 0.12
+        camera.position.z = Math.max(170, Math.min(420, camera.position.z))
       },
       { passive: false }
     )
 
-    // 8. 渲染循环
+    // 6. 动画渲染循环
+    let time = 0
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate)
+      time += 0.03
 
-      // 自动自转与惯性插值
       if (isRotating.value) {
         targetRotation.y += autoRotateSpeed
       }
@@ -284,30 +452,186 @@ const initThree = () => {
       globeGroup.rotation.x = currentRotation.x
       globeGroup.rotation.y = currentRotation.y
 
+      // 节点呼吸动态发光效果 (类似截图脉冲)
+      pulseSprites.forEach(({ sprite, baseScale }, index) => {
+        const pulse = Math.sin(time + index * 1.2) * 0.15 + 1.0
+        sprite.scale.set(baseScale * pulse, baseScale * pulse, 1)
+      })
+
       renderer.render(scene, camera)
     }
 
     animate()
   } catch (err) {
     webGlError.value = true
-    console.warn('WebGL initialization failed, falling back to 2D view:', err)
+    console.warn('WebGL 初始化失败，切换为 2D 视图:', err)
   }
 }
 
-// 聚焦到指定设备
+// 聚焦到指定节点或位置
 const focusOnDevice = (dev: GlobeDevice) => {
   selectedDevice.value = dev
   isRotating.value = false
 
-  // 计算对应经纬度应该对准相机的旋转角度
   const targetY = -(((dev.lng || 0) + 180) * (Math.PI / 180)) + Math.PI / 2
-  const targetX = ((dev.lat || 0) * (Math.PI / 180)) * 0.6
+  const targetX = ((dev.lat || 0) * (Math.PI / 180)) * 0.55
 
   targetRotation.y = targetY
   targetRotation.x = targetX
 }
 
-// 响应容器大小变化
+// 重置视角到默认亚太中心
+const resetView = () => {
+  isRotating.value = true
+  targetRotation = { x: 0.32, y: -2.15 }
+  if (camera) camera.position.z = 275
+}
+
+// 聚焦活跃节点
+const centerActive = () => {
+  if (selectedDevice.value) {
+    focusOnDevice(selectedDevice.value)
+  } else if (props.devices.length > 0) {
+    focusOnDevice(props.devices[0])
+  }
+}
+
+// 发起模拟探测 (截图中的 ▶ 按钮)
+const handleTrace = () => {
+  if (!searchTarget.value.trim()) {
+    if (props.devices.length > 1) {
+      focusOnDevice(props.devices[1])
+    }
+    return
+  }
+  const q = searchTarget.value.trim().toLowerCase()
+  const matched = props.devices.find(
+    (d) =>
+      d.hostname.toLowerCase().includes(q) ||
+      d.ipv4.includes(q) ||
+      d.publicIp.includes(q) ||
+      d.locationName.toLowerCase().includes(q)
+  )
+  if (matched) {
+    focusOnDevice(matched)
+  }
+  isTracing.value = true
+  setTimeout(() => {
+    isTracing.value = false
+  }, 1200)
+}
+
+// 2D 模式渲染
+const render2DMap = () => {
+  if (!canvas2dRef.value) return
+  const canvas = canvas2dRef.value
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+
+  const width = canvas.width
+  const height = canvas.height
+
+  // 1. 海洋底色
+  ctx.fillStyle = props.isDark ? '#0a1220' : '#ebf4fc'
+  ctx.fillRect(0, 0, width, height)
+
+  // 2. 经纬线
+  ctx.strokeStyle = props.isDark ? 'rgba(59, 130, 246, 0.16)' : 'rgba(59, 130, 246, 0.11)'
+  ctx.lineWidth = 1
+  for (let lat = -60; lat <= 60; lat += 30) {
+    const y = ((90 - lat) / 180) * height
+    ctx.beginPath()
+    ctx.moveTo(0, y)
+    ctx.lineTo(width, y)
+    ctx.stroke()
+  }
+  for (let lng = -180; lng <= 180; lng += 30) {
+    const x = ((lng + 180) / 360) * width
+    ctx.beginPath()
+    ctx.moveTo(x, 0)
+    ctx.lineTo(x, height)
+    ctx.stroke()
+  }
+
+  // 3. 陆地轮廓
+  try {
+    const landGeo = topojson.feature(landTopology as any, (landTopology as any).objects.land) as any
+    const multiPoly = landGeo.features[0].geometry.coordinates
+
+    ctx.fillStyle = props.isDark ? '#152238' : '#e4e9ef'
+    ctx.strokeStyle = props.isDark ? '#283c5a' : '#cbd5e1'
+    ctx.lineWidth = 1.0
+
+    for (const poly of multiPoly) {
+      ctx.beginPath()
+      for (const ring of poly) {
+        if (!ring || ring.length === 0) continue
+        for (let i = 0; i < ring.length; i++) {
+          const pt = ring[i]
+          const x = ((pt[0] + 180) / 360) * width
+          const y = ((90 - pt[1]) / 180) * height
+          if (i === 0) ctx.moveTo(x, y)
+          else ctx.lineTo(x, y)
+        }
+      }
+      ctx.fill()
+      ctx.stroke()
+    }
+  } catch (e) {
+    console.error(e)
+  }
+
+  // 4. 贴地低空连线 (2D 平面线段)
+  if (showLines.value && props.devices.length >= 2) {
+    const hub = props.devices[0]
+    const hx = ((hub.lng + 180) / 360) * width
+    const hy = ((90 - hub.lat) / 180) * height
+
+    ctx.strokeStyle = props.isDark ? 'rgba(56, 189, 248, 0.5)' : 'rgba(37, 99, 235, 0.4)'
+    ctx.lineWidth = 1.5
+
+    for (let i = 1; i < props.devices.length; i++) {
+      const peer = props.devices[i]
+      if (peer.status === 'online') {
+        const px = ((peer.lng + 180) / 360) * width
+        const py = ((90 - peer.lat) / 180) * height
+        ctx.beginPath()
+        ctx.moveTo(hx, hy)
+        ctx.lineTo(px, py)
+        ctx.stroke()
+      }
+    }
+  }
+
+  // 5. 绘制节点光晕与圆点
+  props.devices.forEach((dev) => {
+    const x = ((dev.lng + 180) / 360) * width
+    const y = ((90 - dev.lat) / 180) * height
+    const isOnline = dev.status === 'online'
+
+    // 光晕
+    const glowGrad = ctx.createRadialGradient(x, y, 0, x, y, isOnline ? 14 : 7)
+    if (isOnline) {
+      glowGrad.addColorStop(0, 'rgba(37, 99, 235, 0.8)')
+      glowGrad.addColorStop(0.5, 'rgba(59, 130, 246, 0.3)')
+      glowGrad.addColorStop(1, 'rgba(219, 234, 254, 0)')
+    } else {
+      glowGrad.addColorStop(0, 'rgba(148, 163, 184, 0.6)')
+      glowGrad.addColorStop(1, 'rgba(241, 245, 249, 0)')
+    }
+    ctx.fillStyle = glowGrad
+    ctx.beginPath()
+    ctx.arc(x, y, isOnline ? 14 : 7, 0, Math.PI * 2)
+    ctx.fill()
+
+    // 核心实体点
+    ctx.fillStyle = isOnline ? '#1d4ed8' : '#64748b'
+    ctx.beginPath()
+    ctx.arc(x, y, 3, 0, Math.PI * 2)
+    ctx.fill()
+  })
+}
+
 const handleResize = () => {
   if (!containerRef.value || !renderer || !camera) return
   const width = containerRef.value.clientWidth
@@ -317,15 +641,33 @@ const handleResize = () => {
   renderer.setSize(width, height)
 }
 
+watch(
+  () => [props.devices, showLines.value],
+  () => {
+    updateMarkersAndLines()
+    if (viewMode.value === '2d') {
+      render2DMap()
+    }
+  },
+  { deep: true }
+)
+
+watch(
+  () => viewMode.value,
+  (mode) => {
+    if (mode === '2d') {
+      setTimeout(render2DMap, 50)
+    }
+  }
+)
+
 onMounted(() => {
   initThree()
   window.addEventListener('resize', handleResize)
 })
 
 onUnmounted(() => {
-  if (animationFrameId) {
-    cancelAnimationFrame(animationFrameId)
-  }
+  if (animationFrameId) cancelAnimationFrame(animationFrameId)
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('mouseup', onMouseUp)
   if (renderer && renderer.domElement) {
@@ -333,129 +675,231 @@ onUnmounted(() => {
   }
 })
 
-// 暴露聚焦方法
 defineExpose({
   focusOnDevice,
+  resetView,
 })
 </script>
 
 <template>
-  <div class="relative w-full h-[520px] rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-[#f8fafc] dark:bg-[#151d2c] overflow-hidden select-none shadow-2xs">
+  <div class="relative w-full h-[580px] rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-[#f8fafc] dark:bg-[#0c1322] overflow-hidden select-none shadow-2xs group">
     
-    <!-- WebGL 不可用或报错时的优雅降级 -->
-    <div v-if="webGlError" class="w-full h-full p-6 flex flex-col justify-between">
-      <div class="flex items-center justify-between pb-3 border-b border-gray-200 dark:border-gray-800">
-        <div class="flex items-center gap-2">
-          <Globe class="w-5 h-5 text-blue-600 dark:text-blue-400" />
-          <h3 class="font-bold text-gray-900 dark:text-white text-base">全球节点拓扑空间概览</h3>
-        </div>
-        <span class="text-xs text-gray-400">已开启轻量 2D 拓扑视图</span>
-      </div>
+    <!-- 纯净大气层外光晕渐变 (精确还原截图背景柔和光环氛围) -->
+    <div
+      class="absolute inset-0 pointer-events-none transition-opacity duration-500"
+      :style="{
+        background: isDark
+          ? 'radial-gradient(circle at 50% 50%, rgba(14, 165, 233, 0.12) 0%, rgba(12, 19, 34, 0.4) 48%, #0c1322 75%)'
+          : 'radial-gradient(circle at 50% 50%, rgba(186, 230, 253, 0.55) 0%, rgba(224, 242, 254, 0.28) 45%, #f8fafc 72%)',
+      }"
+    ></div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 my-auto">
+    <!-- ----------------- 模式 A: 3D 球体模式 ----------------- -->
+    <div
+      v-show="viewMode === '3d' && !webGlError"
+      ref="containerRef"
+      class="w-full h-full cursor-grab active:cursor-grabbing relative z-0"
+    ></div>
+
+    <!-- ----------------- 模式 B: 2D 平面地图投影模式 ----------------- -->
+    <div
+      v-show="viewMode === '2d' || webGlError"
+      class="w-full h-full relative z-0 flex items-center justify-center p-4 bg-[#f8fafc] dark:bg-[#0c1322]"
+    >
+      <canvas
+        ref="canvas2dRef"
+        width="1600"
+        height="800"
+        class="w-full max-h-[520px] rounded-lg object-contain shadow-sm border border-gray-200 dark:border-gray-800"
+      ></canvas>
+    </div>
+
+    <!-- ----------------- 截图风格悬浮工具控件组 ----------------- -->
+
+    <!-- 1. 左上角菜单展开按钮 (截图左上角 ☰ 按钮) -->
+    <div class="absolute top-4 left-4 z-20">
+      <button
+        type="button"
+        @click="showDeviceList = !showDeviceList"
+        :class="[
+          'p-2.5 rounded-lg border bg-white/95 dark:bg-gray-900/95 backdrop-blur-md shadow-sm transition-all duration-150 active:scale-95 cursor-pointer',
+          showDeviceList
+            ? 'border-blue-500 text-blue-600 dark:text-blue-400 ring-2 ring-blue-500/20'
+            : 'border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white',
+        ]"
+        title="展开/收起节点清单"
+      >
+        <Menu class="w-4 h-4" />
+      </button>
+
+      <!-- 侧边节点快捷展开抽屉 -->
+      <transition
+        enter-active-class="transition duration-150 ease-out"
+        enter-from-class="transform -translate-x-3 opacity-0"
+        enter-to-class="transform translate-x-0 opacity-100"
+        leave-active-class="transition duration-100 ease-in"
+        leave-from-class="transform translate-x-0 opacity-100"
+        leave-to-class="transform -translate-x-3 opacity-0"
+      >
         <div
-          v-for="dev in devices"
-          :key="dev.id"
-          @click="emit('select-device', dev)"
-          class="p-3.5 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/60 hover:border-blue-500 cursor-pointer transition-all space-y-1.5"
+          v-if="showDeviceList"
+          class="mt-2 w-64 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md rounded-xl border border-gray-200 dark:border-gray-800 shadow-xl p-3 text-xs space-y-2 max-h-[420px] overflow-y-auto"
         >
-          <div class="flex items-center justify-between">
-            <span class="font-bold text-sm text-gray-900 dark:text-white">{{ dev.hostname }}</span>
-            <span :class="['w-2 h-2 rounded-full', dev.status === 'online' ? 'bg-emerald-500' : 'bg-gray-400']"></span>
+          <div class="flex items-center justify-between pb-1.5 border-b border-gray-100 dark:border-gray-800 font-semibold text-gray-700 dark:text-gray-300">
+            <span>在线节点清单 ({{ devices.length }})</span>
+            <span class="text-[10px] text-gray-400">点击自动定位</span>
           </div>
-          <div class="text-xs text-gray-500">{{ dev.locationName }}</div>
-          <div class="flex items-center justify-between font-mono text-[11px] pt-1 border-t border-gray-100 dark:border-gray-800 text-gray-400">
-            <span>{{ dev.publicIp }}</span>
-            <span class="text-blue-600 dark:text-blue-400 font-semibold">{{ dev.ipv4 }}</span>
+          <div
+            v-for="d in devices"
+            :key="d.id"
+            @click="focusOnDevice(d)"
+            class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-colors space-y-1"
+          >
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-gray-900 dark:text-white truncate">{{ d.hostname }}</span>
+              <span :class="['w-2 h-2 rounded-full', d.status === 'online' ? 'bg-blue-600' : 'bg-gray-400']"></span>
+            </div>
+            <div class="flex items-center justify-between text-[10px] text-gray-500">
+              <span>{{ d.locationName }}</span>
+              <span class="font-mono text-blue-600 dark:text-blue-400">{{ d.latencyMs }}ms</span>
+            </div>
           </div>
         </div>
-      </div>
+      </transition>
+    </div>
 
-      <div class="text-xs text-gray-400 text-center">
-        点击节点卡片可展开右侧详细参数抽屉并配置路由
+    <!-- 2. 右上角探测与链路卡片 (完美还原截图右上角浮动操作卡片) -->
+    <div class="absolute top-4 right-4 z-20 max-w-sm w-full sm:w-auto">
+      <div class="bg-white/95 dark:bg-gray-900/95 backdrop-blur-md rounded-xl border border-gray-200 dark:border-gray-800 shadow-md p-3 space-y-2.5">
+        
+        <!-- 卡片顶部小拉手装饰条 -->
+        <div class="w-8 h-1 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto -mt-1 opacity-60"></div>
+
+        <!-- 目标 IP / 域名探测输入栏 (类似截图第一行) -->
+        <div class="flex items-center gap-1.5">
+          <span class="text-[10px] font-mono font-bold px-1.5 py-1 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200/80 dark:border-gray-700/80 shrink-0">
+            AUTO
+          </span>
+          <input
+            v-model="searchTarget"
+            type="text"
+            placeholder="目标 IP 或域名，如 10.144.144.1, github.com"
+            @keyup.enter="handleTrace"
+            class="w-full text-xs px-2.5 py-1.5 rounded-md bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+          />
+          <button
+            type="button"
+            @click="handleTrace"
+            :class="[
+              'p-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-all duration-100 active:scale-95 shrink-0 cursor-pointer',
+              isTracing ? 'animate-pulse' : '',
+            ]"
+            title="开始空间探测"
+          >
+            <Play class="w-3.5 h-3.5 fill-current" />
+          </button>
+        </div>
+
+        <!-- 链路状态与操作栏 (类似截图第二行) -->
+        <div class="flex items-center justify-between gap-2 text-xs pt-0.5 border-t border-gray-100 dark:border-gray-800/80 text-gray-600 dark:text-gray-300">
+          <div class="flex items-center gap-1.5 truncate">
+            <Wifi class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+            <span class="font-medium truncate text-[11px]">
+              {{ selectedDevice ? selectedDevice.hostname : '香港核心网关 • 东京' }}
+            </span>
+            <span class="text-[10px] px-1 rounded bg-gray-100 dark:bg-gray-800 text-gray-500 shrink-0">
+              +{{ devices.length > 2 ? devices.length - 2 : 1 }}
+            </span>
+          </div>
+
+          <div class="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              @click="showLines = !showLines"
+              :class="[
+                'text-[11px] px-2 py-0.8 rounded border transition-colors cursor-pointer flex items-center gap-1',
+                showLines
+                  ? 'border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/40'
+                  : 'border-gray-200 dark:border-gray-700 text-gray-400',
+              ]"
+              title="切换贴地低空飞线"
+            >
+              <component :is="showLines ? Eye : EyeOff" class="w-3 h-3" />
+              <span>链路飞线</span>
+            </button>
+            <button
+              type="button"
+              @click="isRotating = !isRotating"
+              :class="[
+                'p-1.5 rounded border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 transition-colors cursor-pointer',
+                isRotating ? 'text-blue-600 dark:text-blue-400' : '',
+              ]"
+              title="自转开关"
+            >
+              <RotateCw class="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
       </div>
     </div>
 
-    <!-- 正常 WebGL Three.js 画布容器 -->
-    <template v-else>
-      <div ref="containerRef" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
+    <!-- 3. 右下角地图视角控制与 3D / 2D 切换栏 (完美还原截图右下角控制条) -->
+    <div class="absolute bottom-4 right-4 z-20 flex items-center gap-1.5 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md p-1 rounded-lg border border-gray-200 dark:border-gray-800 shadow-sm text-xs">
+      
+      <!-- 航向复位按钮 🧭 -->
+      <button
+        type="button"
+        @click="resetView"
+        class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors cursor-pointer"
+        title="复位视角至默认中心"
+      >
+        <Compass class="w-4 h-4 text-blue-600 dark:text-blue-400" />
+      </button>
 
-      <!-- 顶部浮动控制工具条 -->
-      <div class="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none">
-        <div class="flex items-center gap-2 pointer-events-auto bg-white/90 dark:bg-gray-900/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-800 shadow-2xs">
-          <Globe class="w-4 h-4 text-blue-600 dark:text-blue-400" />
-          <span class="text-xs font-semibold text-gray-900 dark:text-white">EasyTier 全球设备空间分布</span>
-          <span class="text-[10px] px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-medium">
-            {{ devices.filter(d => d.status === 'online').length }} 节点在线
-          </span>
-        </div>
+      <!-- 居中目标节点按钮 🎯 -->
+      <button
+        type="button"
+        @click="centerActive"
+        class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors cursor-pointer"
+        title="居中当前节点"
+      >
+        <Crosshair class="w-4 h-4" />
+      </button>
 
-        <!-- 旋转与重置控制 -->
-        <div class="flex items-center gap-1.5 pointer-events-auto bg-white/90 dark:bg-gray-900/90 backdrop-blur-md p-1 rounded-lg border border-gray-200 dark:border-gray-800 shadow-2xs">
-          <button
+      <div class="w-[1px] h-3.5 bg-gray-200 dark:bg-gray-700 mx-0.5"></div>
+
+      <!-- 3D / 2D 分段切换按钮 (截图右下角核心亮点) -->
+      <div class="flex items-center bg-gray-100 dark:bg-gray-800 p-0.5 rounded-md font-mono text-[11px] font-semibold">
+        <button
           type="button"
-          @click="isRotating = !isRotating"
+          @click="viewMode = '3d'"
           :class="[
-            'px-2.5 py-1 text-xs rounded font-medium flex items-center gap-1 transition-colors',
-            isRotating ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900'
+            'px-2 py-0.8 rounded transition-all duration-150 cursor-pointer',
+            viewMode === '3d'
+              ? 'bg-blue-600 text-white shadow-2xs'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white',
           ]"
-          title="切换地球自动旋转"
         >
-          <RefreshCw class="w-3 h-3" :class="{ 'animate-spin': isRotating }" />
-          <span>{{ isRotating ? '旋转中' : '已暂停' }}</span>
+          3D
+        </button>
+        <button
+          type="button"
+          @click="viewMode = '2d'"
+          :class="[
+            'px-2 py-0.8 rounded transition-all duration-150 cursor-pointer',
+            viewMode === '2d'
+              ? 'bg-blue-600 text-white shadow-2xs'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white',
+          ]"
+        >
+          2D
         </button>
       </div>
+
     </div>
 
-    <!-- 左下角图例 (Legend) -->
-    <div class="absolute bottom-3 left-3 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md p-2.5 rounded-lg border border-gray-200 dark:border-gray-800 text-[11px] space-y-1.5 shadow-2xs">
-      <div class="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">空间连通图例</div>
-      <div class="flex items-center gap-2">
-        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-        <span class="text-gray-700 dark:text-gray-300 font-medium">P2P 直连打洞 (Direct Arc)</span>
-      </div>
-      <div class="flex items-center gap-2">
-        <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
-        <span class="text-gray-700 dark:text-gray-300 font-medium">协同中继中转 (Relay Arc)</span>
-      </div>
-      <div class="text-[10px] text-gray-400 pt-0.5 border-t border-gray-100 dark:border-gray-800">
-        按住鼠标左键可 360° 旋转，滚轮可缩放地球
-      </div>
-    </div>
-
-    <!-- 右侧节点浮动快选列表 -->
-    <div class="absolute top-14 right-3 w-56 max-h-[380px] overflow-y-auto space-y-1.5 pointer-events-auto">
-      <div
-        v-for="dev in devices"
-        :key="dev.id"
-        @click="focusOnDevice(dev)"
-        :class="[
-          'p-2 rounded-lg border cursor-pointer backdrop-blur-md transition-all text-xs',
-          selectedDevice?.id === dev.id
-            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-            : 'bg-white/85 dark:bg-gray-900/85 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-800 hover:bg-white dark:hover:bg-gray-800'
-        ]"
-      >
-        <div class="flex items-center justify-between font-semibold">
-          <div class="flex items-center gap-1.5 truncate">
-            <span
-              :class="[
-                'w-2 h-2 rounded-full shrink-0',
-                dev.status === 'online' ? 'bg-emerald-400' : 'bg-gray-400'
-              ]"
-            ></span>
-            <span class="truncate">{{ dev.hostname }}</span>
-          </div>
-          <span class="text-[10px] font-mono opacity-80">{{ dev.latencyMs }}ms</span>
-        </div>
-        <div class="text-[11px] opacity-75 mt-0.5 flex items-center justify-between">
-          <span>{{ dev.locationName }}</span>
-          <span class="font-mono">{{ dev.publicIp }}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- 底部选中节点悬浮卡片 -->
+    <!-- 4. 底部节点详情浮窗 (点击任意节点时优雅展开) -->
     <transition
       enter-active-class="transition duration-150 ease-out"
       enter-from-class="transform translate-y-3 opacity-0"
@@ -466,17 +910,17 @@ defineExpose({
     >
       <div
         v-if="selectedDevice"
-        class="absolute bottom-3 right-3 max-w-sm w-full bg-white/95 dark:bg-gray-900/95 backdrop-blur-md p-3.5 rounded-xl border border-gray-200 dark:border-gray-800 shadow-lg text-xs space-y-2 pointer-events-auto"
+        class="absolute bottom-4 left-4 max-w-sm w-full bg-white/95 dark:bg-gray-900/95 backdrop-blur-md p-3.5 rounded-xl border border-gray-200 dark:border-gray-800 shadow-xl text-xs space-y-2 z-20"
       >
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <span :class="['w-2.5 h-2.5 rounded-full', selectedDevice.status === 'online' ? 'bg-emerald-500' : 'bg-gray-400']"></span>
+            <span :class="['w-2.5 h-2.5 rounded-full', selectedDevice.status === 'online' ? 'bg-blue-600' : 'bg-gray-400']"></span>
             <span class="font-bold text-gray-900 dark:text-white text-sm">{{ selectedDevice.hostname }}</span>
             <span class="text-[10px] px-1.5 py-0.2 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
               {{ selectedDevice.locationName }}
             </span>
           </div>
-          <button type="button" @click="selectedDevice = null" class="text-gray-400 hover:text-gray-600">
+          <button type="button" @click="selectedDevice = null" class="text-gray-400 hover:text-gray-600 cursor-pointer">
             <X class="w-4 h-4" />
           </button>
         </div>
@@ -497,15 +941,14 @@ defineExpose({
           <button
             type="button"
             @click="emit('select-device', selectedDevice)"
-            class="text-blue-600 dark:text-blue-400 font-semibold hover:underline inline-flex items-center gap-0.5"
+            class="text-blue-600 dark:text-blue-400 font-semibold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
           >
-            打开节点详情抽屉
+            打开节点参数抽屉
             <ArrowUpRight class="w-3 h-3" />
           </button>
         </div>
       </div>
     </transition>
-    </template>
 
   </div>
 </template>

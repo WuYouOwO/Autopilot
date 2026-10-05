@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useTheme } from '@/composables/useTheme'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import GlobeMap from '@/components/globe/GlobeMap.vue'
 import type { GlobeDevice } from '@/types/globe'
@@ -54,6 +55,8 @@ interface ManagedNetwork {
   relayHubs: string[]
   createdDate: string
 }
+
+const { isDark } = useTheme()
 
 const managedNetworks = ref<ManagedNetwork[]>([
   {
@@ -265,6 +268,64 @@ const nodes = ref([
     easytierVersion: 'v2.1.7',
     listeners: ['udp://0.0.0.0:11010'],
     peersList: [],
+  },
+  {
+    id: 'node-sg-relay',
+    hostname: 'sg-edge-relay',
+    domain: 'sg-edge-relay.easytier.local',
+    os: 'Ubuntu 24.04 LTS (x86_64)',
+    osType: 'linux',
+    locationName: '新加坡特别节点',
+    countryCode: 'SG',
+    publicIp: '103.28.248.1',
+    lat: 1.3521,
+    lng: 103.8198,
+    ipv4: '10.144.144.5',
+    ipv6: 'fd00:144:144::5',
+    status: 'online' as const,
+    connection: '直连 P2P',
+    natType: 'Full Cone NAT (全锥形)',
+    latencyMs: 32,
+    lastSeen: '实时在线',
+    subnets: [],
+    isSubnetApproved: false,
+    isExitNode: false,
+    tags: ['tag:亚太边缘', 'tag:中继通道'],
+    keyExpiry: '永久有效',
+    easytierVersion: 'v2.2.0',
+    listeners: ['tcp://0.0.0.0:11010', 'udp://0.0.0.0:11010'],
+    peersList: [
+      { name: 'hk-gateway-edge', ip: '10.144.144.1', mode: '直连 (STUN UDP 打洞)', latency: '32ms', rx: '24.1 MB', tx: '18.9 MB' },
+    ],
+  },
+  {
+    id: 'node-fra-hub',
+    hostname: 'fra-cloud-hub',
+    domain: 'fra-cloud-hub.easytier.local',
+    os: 'Debian GNU/Linux 12',
+    osType: 'linux',
+    locationName: '德国法兰克福云中继',
+    countryCode: 'DE',
+    publicIp: '194.12.45.101',
+    lat: 50.1109,
+    lng: 8.6821,
+    ipv4: '10.144.144.8',
+    ipv6: 'fd00:144:144::8',
+    status: 'online' as const,
+    connection: '中继转发',
+    natType: 'Restricted Cone NAT (受限锥形)',
+    latencyMs: 145,
+    lastSeen: '实时在线',
+    subnets: [],
+    isSubnetApproved: false,
+    isExitNode: true,
+    tags: ['tag:欧洲出口', 'tag:数据中心'],
+    keyExpiry: '永久有效',
+    easytierVersion: 'v2.2.0',
+    listeners: ['tcp://0.0.0.0:11010'],
+    peersList: [
+      { name: 'hk-gateway-edge', ip: '10.144.144.1', mode: '中继 (骨干互联)', latency: '145ms', rx: '4.2 MB', tx: '12.1 MB' },
+    ],
   },
 ])
 
@@ -905,7 +966,7 @@ const runAllTests = () => {
             </button>
           </div>
 
-          <GlobeMap :devices="globeDevices" @select-device="openDrawer" />
+          <GlobeMap :devices="globeDevices" :is-dark="isDark" @select-device="openDrawer" />
         </div>
       </main>
 
@@ -1134,7 +1195,7 @@ const runAllTests = () => {
 
         <!-- 模式 A: 3D 球形地图实时空间展示模式 -->
         <div v-if="displayMode === 'globe'" class="mb-6 space-y-3">
-          <GlobeMap :devices="globeDevices" @select-device="openDrawer" />
+          <GlobeMap :devices="globeDevices" :is-dark="isDark" @select-device="openDrawer" />
         </div>
 
         <!-- 模式 B: Machines 设备列表表格 -->
