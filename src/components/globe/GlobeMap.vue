@@ -68,6 +68,7 @@ let renderer: THREE.WebGLRenderer
 let globeGroup: THREE.Group
 let linesGroup: THREE.Group
 let markersGroup: THREE.Group
+let earthMesh: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial> | null = null
 let pulseSprites: { sprite: THREE.Sprite; baseScale: number }[] = []
 let animationFrameId: number
 
@@ -97,7 +98,7 @@ const latLngToVector3 = (lat: number, lng: number, radius: number): THREE.Vector
   return new THREE.Vector3(x, y, z)
 }
 
-// 动态生成高清世界陆地与经纬网画布贴图 (实现类似截图中的白净淡蓝极简风格)
+// 动态生成高清世界陆地与经纬网画布贴图 (实现参考图中高亮纯净淡蓝+纯白陆地现代极简风格)
 const createEarthTexture = (dark: boolean): THREE.CanvasTexture => {
   const width = 2048
   const height = 1024
@@ -106,12 +107,12 @@ const createEarthTexture = (dark: boolean): THREE.CanvasTexture => {
   canvas.height = height
   const ctx = canvas.getContext('2d')!
 
-  // 1. 海洋背景底色 (浅色模式为极淡的冰蓝天色，暗色模式为深空蓝)
-  ctx.fillStyle = dark ? '#0a1220' : '#ebf4fc'
+  // 1. 海洋背景底色 (浅色模式为通透明亮纯净的天空淡蓝水体 #e0f2fe，暗色模式为深空蓝)
+  ctx.fillStyle = dark ? '#0a1220' : '#e0f2fe'
   ctx.fillRect(0, 0, width, height)
 
-  // 2. 经纬度网格线 (微透天空蓝细线，与截图一致)
-  ctx.strokeStyle = dark ? 'rgba(59, 130, 246, 0.16)' : 'rgba(59, 130, 246, 0.11)'
+  // 2. 经纬度网格线 (微透天空蓝细线，与参考图一致)
+  ctx.strokeStyle = dark ? 'rgba(56, 189, 248, 0.22)' : 'rgba(56, 189, 248, 0.32)'
   ctx.lineWidth = 1.0
 
   // 纬线 (每 30 度)
@@ -132,20 +133,21 @@ const createEarthTexture = (dark: boolean): THREE.CanvasTexture => {
     ctx.stroke()
   }
 
-  // 赤道加深高亮
-  ctx.strokeStyle = dark ? 'rgba(59, 130, 246, 0.25)' : 'rgba(59, 130, 246, 0.2)'
+  // 赤道微加深高亮
+  ctx.strokeStyle = dark ? 'rgba(56, 189, 248, 0.35)' : 'rgba(14, 165, 233, 0.45)'
+  ctx.lineWidth = 1.4
   ctx.beginPath()
   ctx.moveTo(0, height / 2)
   ctx.lineTo(width, height / 2)
   ctx.stroke()
 
-  // 3. 绘制真实世界各大洲陆地多边形 (浅灰填充与清晰灰蓝海岸线轮廓)
+  // 3. 绘制真实世界各大洲陆地多边形 (浅色模式下为明亮纯白 #ffffff，海岸线为柔和浅灰蓝 #94a3b8)
   try {
     const landGeo = topojson.feature(landTopology as any, (landTopology as any).objects.land) as any
     const multiPoly = landGeo.features[0].geometry.coordinates
 
-    ctx.fillStyle = dark ? '#152238' : '#e4e9ef'
-    ctx.strokeStyle = dark ? '#283c5a' : '#cbd5e1'
+    ctx.fillStyle = dark ? '#16233b' : '#ffffff'
+    ctx.strokeStyle = dark ? '#283c5a' : '#94a3b8'
     ctx.lineWidth = 1.2
     ctx.lineJoin = 'round'
 
@@ -169,6 +171,7 @@ const createEarthTexture = (dark: boolean): THREE.CanvasTexture => {
   }
 
   const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
   texture.wrapS = THREE.RepeatWrapping
   texture.wrapT = THREE.ClampToEdgeWrapping
   return texture
@@ -190,12 +193,12 @@ const createGlowTexture = (isOnline: boolean, dark: boolean): THREE.CanvasTextur
       grad.addColorStop(0.8, 'rgba(3, 105, 161, 0.1)')
       grad.addColorStop(1, 'rgba(3, 105, 161, 0)')
     } else {
-      // 浅色模式：浓郁且泛着光晕的湖蓝/深蓝
-      grad.addColorStop(0, 'rgba(29, 78, 216, 1)')
-      grad.addColorStop(0.22, 'rgba(37, 99, 235, 0.85)')
-      grad.addColorStop(0.48, 'rgba(59, 130, 246, 0.4)')
-      grad.addColorStop(0.78, 'rgba(147, 197, 253, 0.15)')
-      grad.addColorStop(1, 'rgba(219, 234, 254, 0)')
+      // 浅色模式：浓郁且泛着光晕的清澈天蓝/湛蓝发光晕圈 (与参考图一致)
+      grad.addColorStop(0, 'rgba(2, 132, 199, 1)')
+      grad.addColorStop(0.22, 'rgba(14, 165, 233, 0.8)')
+      grad.addColorStop(0.5, 'rgba(56, 189, 248, 0.35)')
+      grad.addColorStop(0.8, 'rgba(186, 230, 253, 0.12)')
+      grad.addColorStop(1, 'rgba(224, 242, 254, 0)')
     }
   } else {
     grad.addColorStop(0, 'rgba(148, 163, 184, 0.8)')
@@ -205,10 +208,12 @@ const createGlowTexture = (isOnline: boolean, dark: boolean): THREE.CanvasTextur
 
   ctx.fillStyle = grad
   ctx.fillRect(0, 0, 128, 128)
-  return new THREE.CanvasTexture(canvas)
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.colorSpace = THREE.SRGBColorSpace
+  return tex
 }
 
-// 创建贴地低空飞线 (满足用户需求：不要搞那种特别高的线！低空贴地仅微凸 1.2%)
+// 创建贴地低空飞线 (满足用户需求：不要搞那种特别高的线！低空贴地仅微凸 0.8%)
 const createLowAltitudeArc = (startVec: THREE.Vector3, endVec: THREE.Vector3, colorHex: number): THREE.Line => {
   const points: THREE.Vector3[] = []
   const segments = 48
@@ -229,8 +234,8 @@ const createLowAltitudeArc = (startVec: THREE.Vector3, endVec: THREE.Vector3, co
       current.copy(startNorm).multiplyScalar(w1).add(endNorm.clone().multiplyScalar(w2))
     }
 
-    // 关键：贴地低空控制，中间最高处仅高出表面 1.2% (RADIUS * 1.012)，完全贴合地表弧度
-    const elevation = 1 + Math.sin(t * Math.PI) * 0.012
+    // 关键：贴地低空控制，中间最高处仅高出表面 0.8% (RADIUS * 1.008)，完全贴合地表弧度
+    const elevation = 1 + Math.sin(t * Math.PI) * 0.008
     current.normalize().multiplyScalar(RADIUS * elevation)
     points.push(current)
   }
@@ -239,7 +244,7 @@ const createLowAltitudeArc = (startVec: THREE.Vector3, endVec: THREE.Vector3, co
   const material = new THREE.LineBasicMaterial({
     color: colorHex,
     transparent: true,
-    opacity: props.isDark ? 0.65 : 0.45,
+    opacity: props.isDark ? 0.75 : 0.6,
     linewidth: 1.2,
   })
 
@@ -330,6 +335,7 @@ const initThree = () => {
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
     renderer.setSize(width, height)
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    renderer.outputColorSpace = THREE.SRGBColorSpace
     containerRef.value.appendChild(renderer.domElement)
 
     globeGroup = new THREE.Group()
@@ -338,40 +344,19 @@ const initThree = () => {
     linesGroup = new THREE.Group()
     markersGroup = new THREE.Group()
 
-    // 1. 核心地球球体 (贴上真实世界陆地与经纬网画布贴图)
+    // 1. 核心地球球体 (使用 MeshBasicMaterial 彻底消除背光阴影与发灰暗角，实现 100% 全面纯净高亮通透质感)
     const earthTexture = createEarthTexture(props.isDark)
     const sphereGeo = new THREE.SphereGeometry(RADIUS, 64, 64)
-    const sphereMat = new THREE.MeshStandardMaterial({
+    const sphereMat = new THREE.MeshBasicMaterial({
       map: earthTexture,
-      roughness: 0.88,
-      metalness: 0.05,
     })
-    const earthMesh = new THREE.Mesh(sphereGeo, sphereMat)
+    earthMesh = new THREE.Mesh(sphereGeo, sphereMat)
     globeGroup.add(earthMesh)
 
     globeGroup.add(linesGroup)
     globeGroup.add(markersGroup)
 
-    // 2. 外部极微弱发光大气层光晕 (如截图中的纯净淡蓝光晕)
-    const glowGeo = new THREE.SphereGeometry(RADIUS * 1.018, 32, 32)
-    const glowMat = new THREE.MeshBasicMaterial({
-      color: props.isDark ? 0x38bdf8 : 0x60a5fa,
-      transparent: true,
-      opacity: props.isDark ? 0.08 : 0.04,
-      side: THREE.BackSide,
-    })
-    const glowMesh = new THREE.Mesh(glowGeo, glowMat)
-    globeGroup.add(glowMesh)
-
-    // 3. 灯光系统
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.25)
-    scene.add(ambientLight)
-
-    const sunLight = new THREE.DirectionalLight(0xffffff, 0.75)
-    sunLight.position.set(150, 180, 200)
-    scene.add(sunLight)
-
-    // 4. 节点与低空飞线
+    // 2. 节点与低空飞线
     const nodeMarkers = updateMarkersAndLines() || []
 
     // 5. 鼠标与拖拽控制
@@ -531,12 +516,12 @@ const render2DMap = () => {
   const width = canvas.width
   const height = canvas.height
 
-  // 1. 海洋底色
-  ctx.fillStyle = props.isDark ? '#0a1220' : '#ebf4fc'
+  // 1. 海洋底色 (与 3D 地球仪保持完全一致的高亮清爽淡天蓝)
+  ctx.fillStyle = props.isDark ? '#0a1220' : '#e0f2fe'
   ctx.fillRect(0, 0, width, height)
 
   // 2. 经纬线
-  ctx.strokeStyle = props.isDark ? 'rgba(59, 130, 246, 0.16)' : 'rgba(59, 130, 246, 0.11)'
+  ctx.strokeStyle = props.isDark ? 'rgba(56, 189, 248, 0.22)' : 'rgba(56, 189, 248, 0.32)'
   ctx.lineWidth = 1
   for (let lat = -60; lat <= 60; lat += 30) {
     const y = ((90 - lat) / 180) * height
@@ -553,13 +538,13 @@ const render2DMap = () => {
     ctx.stroke()
   }
 
-  // 3. 陆地轮廓
+  // 3. 陆地轮廓 (明亮纯白 #ffffff 与清晰浅灰蓝海岸线轮廓 #94a3b8)
   try {
     const landGeo = topojson.feature(landTopology as any, (landTopology as any).objects.land) as any
     const multiPoly = landGeo.features[0].geometry.coordinates
 
-    ctx.fillStyle = props.isDark ? '#152238' : '#e4e9ef'
-    ctx.strokeStyle = props.isDark ? '#283c5a' : '#cbd5e1'
+    ctx.fillStyle = props.isDark ? '#16233b' : '#ffffff'
+    ctx.strokeStyle = props.isDark ? '#283c5a' : '#94a3b8'
     ctx.lineWidth = 1.0
 
     for (const poly of multiPoly) {
@@ -587,7 +572,7 @@ const render2DMap = () => {
     const hx = ((hub.lng + 180) / 360) * width
     const hy = ((90 - hub.lat) / 180) * height
 
-    ctx.strokeStyle = props.isDark ? 'rgba(56, 189, 248, 0.5)' : 'rgba(37, 99, 235, 0.4)'
+    ctx.strokeStyle = props.isDark ? 'rgba(56, 189, 248, 0.65)' : 'rgba(2, 132, 199, 0.6)'
     ctx.lineWidth = 1.5
 
     for (let i = 1; i < props.devices.length; i++) {
@@ -612,9 +597,10 @@ const render2DMap = () => {
     // 光晕
     const glowGrad = ctx.createRadialGradient(x, y, 0, x, y, isOnline ? 14 : 7)
     if (isOnline) {
-      glowGrad.addColorStop(0, 'rgba(37, 99, 235, 0.8)')
-      glowGrad.addColorStop(0.5, 'rgba(59, 130, 246, 0.3)')
-      glowGrad.addColorStop(1, 'rgba(219, 234, 254, 0)')
+      glowGrad.addColorStop(0, 'rgba(2, 132, 199, 0.9)')
+      glowGrad.addColorStop(0.3, 'rgba(14, 165, 233, 0.6)')
+      glowGrad.addColorStop(0.65, 'rgba(56, 189, 248, 0.25)')
+      glowGrad.addColorStop(1, 'rgba(224, 242, 254, 0)')
     } else {
       glowGrad.addColorStop(0, 'rgba(148, 163, 184, 0.6)')
       glowGrad.addColorStop(1, 'rgba(241, 245, 249, 0)')
@@ -625,7 +611,7 @@ const render2DMap = () => {
     ctx.fill()
 
     // 核心实体点
-    ctx.fillStyle = isOnline ? '#1d4ed8' : '#64748b'
+    ctx.fillStyle = isOnline ? '#0284c7' : '#64748b'
     ctx.beginPath()
     ctx.arc(x, y, 3, 0, Math.PI * 2)
     ctx.fill()
@@ -650,6 +636,20 @@ watch(
     }
   },
   { deep: true }
+)
+
+watch(
+  () => props.isDark,
+  (dark) => {
+    if (earthMesh) {
+      earthMesh.material.map = createEarthTexture(dark)
+      earthMesh.material.needsUpdate = true
+    }
+    updateMarkersAndLines()
+    if (viewMode.value === '2d') {
+      render2DMap()
+    }
+  }
 )
 
 watch(
@@ -682,15 +682,15 @@ defineExpose({
 </script>
 
 <template>
-  <div class="relative w-full h-[580px] rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-[#f8fafc] dark:bg-[#0c1322] overflow-hidden select-none shadow-2xs group">
+  <div class="relative w-full h-[580px] rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#0c1322] overflow-hidden select-none shadow-2xs group">
     
-    <!-- 纯净大气层外光晕渐变 (精确还原截图背景柔和光环氛围) -->
+    <!-- 纯净大气层外光晕渐变 (纯净通透高亮氛围，彻底解决地球发黑问题) -->
     <div
       class="absolute inset-0 pointer-events-none transition-opacity duration-500"
       :style="{
         background: isDark
-          ? 'radial-gradient(circle at 50% 50%, rgba(14, 165, 233, 0.12) 0%, rgba(12, 19, 34, 0.4) 48%, #0c1322 75%)'
-          : 'radial-gradient(circle at 50% 50%, rgba(186, 230, 253, 0.55) 0%, rgba(224, 242, 254, 0.28) 45%, #f8fafc 72%)',
+          ? 'radial-gradient(circle at 50% 50%, rgba(14, 165, 233, 0.15) 0%, rgba(12, 19, 34, 0.4) 48%, #0c1322 75%)'
+          : 'radial-gradient(circle at 50% 50%, rgba(186, 230, 253, 0.65) 0%, rgba(224, 242, 254, 0.35) 48%, #ffffff 76%)',
       }"
     ></div>
 
