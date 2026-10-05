@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import {
   Maximize2,
   Minimize2,
@@ -37,6 +37,7 @@ export interface TopologyNode {
   // 画布位置
   x: number
   y: number
+  raw?: any
 }
 
 export interface TopologyLink {
@@ -160,10 +161,8 @@ const defaultNodes: TopologyNode[] = [
   },
 ]
 
-const topologyNodes = ref<TopologyNode[]>([...defaultNodes])
-
-// 拓扑链路数据（直连 P2P 实线 vs Relay 中继虚线）
-const topologyLinks = ref<TopologyLink[]>([
+// 静态拓扑默认链路数据（直连 P2P 实线 vs Relay 中继虚线）
+const defaultLinks: TopologyLink[] = [
   {
     id: 'link-1',
     sourceId: 'node-home-pve',
@@ -212,7 +211,123 @@ const topologyLinks = ref<TopologyLink[]>([
     protocol: 'TCP',
     latency: '68 ms',
   },
-])
+]
+
+const topologyNodes = ref<TopologyNode[]>([...defaultNodes])
+const topologyLinks = ref<TopologyLink[]>([...defaultLinks])
+
+// 响应式接通外部 props.nodes：自适应分层布局与 P2P 对端网状拓扑构建
+const initializeTopologyFromProps = () => {
+  if (!props.nodes || props.nodes.length === 0) {
+    topologyNodes.value = JSON.parse(JSON.stringify(defaultNodes))
+    topologyLinks.value = JSON.parse(JSON.stringify(defaultLinks))
+    return
+  }
+
+  // 记录用户已手动拖拽的位置，避免每次节点状态变化时坐标突变
+  const existingPosMap = new Map<string, { x: number; y: number }>()
+  topologyNodes.value.forEach((n) => {
+    existingPosMap.set(n.id, { x: n.x, y: n.y })
+  })
+
+  const rawNodes = props.nodes
+  const newNodes: TopologyNode[] = []
+
+  // 智能树形/网状分层坐标生成算法
+  const cols = Math.min(3, Math.max(2, Math.ceil(Math.sqrt(rawNodes.length))))
+  const colSpacing = 240
+  const rowSpacing = 160
+  const startY = 40
+
+  rawNodes.forEach((n: any, idx: number) => {
+    const existing = existingPosMap.get(n.id)
+    const row = Math.floor(idx / cols)
+    const col = idx % cols
+    const itemsInRow = row === Math.floor((rawNodes.length - 1) / cols) ? rawNodes.length - row * cols : cols
+    const rowStartX = 400 - ((itemsInRow - 1) * colSpacing) / 2
+
+    const defaultX = rowStartX + col * colSpacing
+    const defaultY = startY + row * rowSpacing
+
+    newNodes.push({
+      id: n.id,
+      hostname: n.hostname,
+      domain: n.domain,
+      ipv4: n.ipv4?.includes('/') ? n.ipv4 : `${n.ipv4}/24`,
+      ipv6: n.ipv6,
+      osType: n.osType || 'linux',
+      status: n.status || 'online',
+      connection: n.connection || '直连 P2P',
+      isLocal: n.isLocal || idx === 0,
+      isExitNode: n.isExitNode || false,
+      latencyMs: n.latencyMs || 20,
+      locationName: n.locationName || '',
+      publicIp: n.publicIp,
+      subnets: n.subnets || [],
+      x: existing ? existing.x : defaultX,
+      y: existing ? existing.y : defaultY,
+      raw: n,
+    })
+  })
+
+  // 根据各个节点的 peersList 构建真实对端连线
+  const newLinks: TopologyLink[] = []
+  const linkKeys = new Set<string>()
+
+  newNodes.forEach((node) => {
+    const raw = node.raw
+    if (raw?.peersList && Array.isArray(raw.peersList) && raw.peersList.length > 0) {
+      raw.peersList.forEach((peer: any) => {
+        const target = newNodes.find((tn) => tn.hostname === peer.name || (peer.ip && tn.ipv4.startsWith(peer.ip)))
+        if (target && target.id !== node.id) {
+          const key = [node.id, target.id].sort().join('--')
+          if (!linkKeys.has(key)) {
+            linkKeys.add(key)
+            const isRelay = peer.mode?.includes('中继') || peer.mode?.includes('relay')
+            newLinks.push({
+              id: `link-${node.id}-${target.id}`,
+              sourceId: node.id,
+              targetId: target.id,
+              mode: isRelay ? 'relay' : 'p2p',
+              protocol: peer.mode?.includes('UDP') ? 'UDP' : 'TCP',
+              latency: peer.latency || `${target.latencyMs || 20}ms`,
+            })
+          }
+        }
+      })
+    }
+  })
+
+  // 若节点未指定 peersList，则将主网关/出口节点与其他节点连线形成中心星型网络
+  if (newLinks.length === 0 && newNodes.length > 1) {
+    const hubNode = newNodes.find((n) => n.isExitNode) || newNodes[0]
+    newNodes.forEach((n) => {
+      if (n.id !== hubNode.id) {
+        const isRelay = n.connection?.includes('中继') || n.connection?.toLowerCase().includes('relay')
+        newLinks.push({
+          id: `link-${hubNode.id}-${n.id}`,
+          sourceId: hubNode.id,
+          targetId: n.id,
+          mode: isRelay ? 'relay' : 'p2p',
+          protocol: isRelay ? 'UDP / Relay' : 'STUN UDP',
+          latency: `${n.latencyMs || 24}ms`,
+        })
+      }
+    })
+  }
+
+  topologyNodes.value = newNodes
+  topologyLinks.value = newLinks
+}
+
+// 深度监听 props.nodes，支持实时响应 ConsoleView 传入的节点动态变更
+watch(
+  () => props.nodes,
+  () => {
+    initializeTopologyFromProps()
+  },
+  { deep: true, immediate: true }
+)
 
 // 设备图标匹配
 const getNodeIcon = (type?: string) => {
@@ -379,13 +494,13 @@ const zoomOut = () => {
 
 // 重置排布
 const resetLayout = () => {
-  topologyNodes.value = JSON.parse(JSON.stringify(defaultNodes))
+  initializeTopologyFromProps()
   fitView()
 }
 
 // 点击节点触发选择
 const handleSelectNode = (node: TopologyNode) => {
-  emit('select-node', node)
+  emit('select-node', node.raw || node)
 }
 
 let resizeObserver: ResizeObserver | null = null

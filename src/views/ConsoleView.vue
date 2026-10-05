@@ -260,13 +260,35 @@ const showToast = (msg: string) => {
   }, 2200)
 }
 
-const copyText = (text: string, label: string) => {
-  navigator.clipboard.writeText(text)
-  copiedKey.value = text
-  showToast(`已复制 ${label}: ${text}`)
-  setTimeout(() => {
-    if (copiedKey.value === text) copiedKey.value = null
-  }, 1800)
+// 连接模式枚举与规范化定义（避免依赖硬编码中文文本匹配）
+export type ConnectionMode = 'p2p' | 'relay' | 'disconnected'
+
+const copyText = async (text: string, label: string) => {
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+    } else {
+      // 降级兼容：兼容非 HTTPS 安全上下文或未授予权限的环境
+      const textArea = document.createElement('textarea')
+      textArea.value = text
+      textArea.style.position = 'fixed'
+      textArea.style.opacity = '0'
+      document.body.appendChild(textArea)
+      textArea.focus()
+      textArea.select()
+      const successful = document.execCommand('copy')
+      document.body.removeChild(textArea)
+      if (!successful) throw new Error('execCommand failed')
+    }
+    copiedKey.value = text
+    showToast(`已成功复制 ${label}: ${text}`)
+    setTimeout(() => {
+      if (copiedKey.value === text) copiedKey.value = null
+    }, 1800)
+  } catch (err) {
+    console.warn(`[Clipboard] 复制 ${label} 异常:`, err)
+    showToast(`复制失败，请手动选择复制 ${label}`)
+  }
 }
 
 // --- 设备节点数据 (含全球 IP 物理经纬度定位信息) ---
@@ -286,6 +308,7 @@ const nodes = ref([
     ipv6: 'fd00:144:144::1',
     status: 'online' as const,
     connection: '直连 P2P',
+    connectionMode: 'p2p' as ConnectionMode,
     natType: 'Full Cone NAT (全锥形)',
     latencyMs: 14,
     lastSeen: '实时在线',
@@ -316,6 +339,7 @@ const nodes = ref([
     ipv6: 'fd00:144:144::2',
     status: 'online' as const,
     connection: '直连 P2P',
+    connectionMode: 'p2p' as ConnectionMode,
     natType: 'Restricted Cone NAT (受限锥形)',
     latencyMs: 24,
     lastSeen: '实时在线',
@@ -345,6 +369,7 @@ const nodes = ref([
     ipv6: 'fd00:144:144::10',
     status: 'online' as const,
     connection: '中继转发',
+    connectionMode: 'relay' as ConnectionMode,
     natType: 'Symmetric NAT (对称型)',
     latencyMs: 78,
     lastSeen: '实时在线',
@@ -374,6 +399,7 @@ const nodes = ref([
     ipv6: 'fd00:144:144::15',
     status: 'offline' as const,
     connection: '已断开',
+    connectionMode: 'disconnected' as ConnectionMode,
     natType: '未知',
     latencyMs: 0,
     lastSeen: '2 小时前',
@@ -401,6 +427,7 @@ const nodes = ref([
     ipv6: 'fd00:144:144::5',
     status: 'online' as const,
     connection: '直连 P2P',
+    connectionMode: 'p2p' as ConnectionMode,
     natType: 'Full Cone NAT (全锥形)',
     latencyMs: 32,
     lastSeen: '实时在线',
@@ -430,6 +457,7 @@ const nodes = ref([
     ipv6: 'fd00:144:144::8',
     status: 'online' as const,
     connection: '中继转发',
+    connectionMode: 'relay' as ConnectionMode,
     natType: 'Restricted Cone NAT (受限锥形)',
     latencyMs: 145,
     lastSeen: '实时在线',
@@ -480,8 +508,27 @@ const avgLatency = computed(() => {
   return Math.round(sum / onlineWithLat.length)
 })
 
-const p2pNodesCount = computed(() => nodes.value.filter((n) => n.status === 'online' && n.connection.includes('直连')).length)
-const relayNodesCount = computed(() => nodes.value.filter((n) => n.status === 'online' && !n.connection.includes('直连')).length)
+// 规范化连接类型判定函数，避免硬编码中文字符串匹配，解耦数据层与展示层
+const isP2PConnection = (node: { connectionMode?: string; connection?: string; status?: string }): boolean => {
+  if (node.status === 'offline') return false
+  if (node.connectionMode) {
+    return node.connectionMode.toLowerCase() === 'p2p'
+  }
+  const conn = (node.connection || '').toLowerCase()
+  return conn.includes('p2p') || conn.includes('direct') || conn.includes('直连')
+}
+
+const isRelayConnection = (node: { connectionMode?: string; connection?: string; status?: string }): boolean => {
+  if (node.status === 'offline') return false
+  if (node.connectionMode) {
+    return node.connectionMode.toLowerCase() === 'relay'
+  }
+  const conn = (node.connection || '').toLowerCase()
+  return conn.includes('relay') || conn.includes('中继') || (!isP2PConnection(node) && node.status === 'online')
+}
+
+const p2pNodesCount = computed(() => nodes.value.filter((n) => n.status === 'online' && isP2PConnection(n)).length)
+const relayNodesCount = computed(() => nodes.value.filter((n) => n.status === 'online' && isRelayConnection(n)).length)
 const p2pSuccessRate = computed(() => {
   const total = onlineNodesCount.value
   if (!total) return '75.0'
@@ -563,6 +610,7 @@ const addNewMockDevice = () => {
     ipv6: `fd00:144:144::${nodes.value.length + 20}`,
     status: 'online' as const,
     connection: '直连 P2P',
+    connectionMode: 'p2p' as ConnectionMode,
     natType: 'Full Cone NAT',
     latencyMs: 18,
     lastSeen: '实时在线',
@@ -1634,6 +1682,7 @@ const runAllTests = () => {
           <!-- A. 网络拓扑单图铺满 -->
           <div v-if="overviewViewTab === 'topology'" class="w-full">
             <NetworkTopology
+              :nodes="nodes"
               :network-name="currentNetwork.name"
               :is-dark="isDark"
               @select-node="openDrawer"
@@ -1648,6 +1697,7 @@ const runAllTests = () => {
           <!-- C. 双图同屏左右并排铺满 (宽屏分栏) -->
           <div v-else-if="overviewViewTab === 'split'" class="grid grid-cols-1 xl:grid-cols-2 gap-4 w-full">
             <NetworkTopology
+              :nodes="nodes"
               :network-name="currentNetwork.name"
               :is-dark="isDark"
               @select-node="openDrawer"
@@ -1902,6 +1952,7 @@ const runAllTests = () => {
         <!-- 模式 B: 2D 网络拓扑图模式 (参照参考图) -->
         <div v-else-if="displayMode === 'topology'" class="mb-6 space-y-3">
           <NetworkTopology
+            :nodes="nodes"
             :network-name="currentNetwork.name"
             :is-dark="isDark"
             @select-node="openDrawer"
@@ -2022,7 +2073,7 @@ const runAllTests = () => {
                         <span
                           :class="[
                             'px-1.5 py-0.2 rounded font-semibold',
-                            node.connection === '直连 P2P'
+                            isP2PConnection(node)
                               ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
                               : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
                           ]"
