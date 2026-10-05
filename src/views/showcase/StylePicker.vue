@@ -21,7 +21,7 @@ import {
 
 type StyleId = 'cloudflare' | 'tailscale' | 'netbird' | 'linear'
 
-const currentStyle = ref<StyleId>('cloudflare')
+const currentStyle = ref<StyleId>('tailscale')
 const showAnalysis = ref(false)
 
 const stylesList = [
