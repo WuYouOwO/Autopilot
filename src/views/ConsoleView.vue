@@ -74,41 +74,15 @@ const managedNetworks = ref<ManagedNetwork[]>([
     id: 'net-default',
     name: 'default-mesh',
     status: 'active',
-    nodeCount: 4,
-    onlineCount: 3,
+    nodeCount: 0,
+    onlineCount: 0,
     ipv4Cidr: '10.144.144.0/24',
-    ipv6Cidr: 'fd00:144:144::/64',
-    secretKey: 'et-mesh-sec-889922',
-    rpcPortal: 'tcp://hub.easytier.top:11010',
-    relayHubs: ['hk-relay.easytier.top:11010', 'tokyo-relay.easytier.top:11010'],
-    createdDate: '2026-09-15',
-  },
-  {
-    id: 'net-office',
-    name: 'datacenter-vpc',
-    status: 'active',
-    nodeCount: 8,
-    onlineCount: 8,
-    ipv4Cidr: '10.200.0.0/16',
-    ipv6Cidr: 'fd00:200:0::/48',
-    secretKey: 'corp-secure-token-2026',
-    rpcPortal: 'tcp://dc-hub.internal:11010',
-    relayHubs: ['dc-relay1.internal:11010'],
-    createdDate: '2026-09-28',
-  },
-  {
-    id: 'net-homelab',
-    name: 'homelab-cluster',
-    status: 'active',
-    nodeCount: 3,
-    onlineCount: 2,
-    ipv4Cidr: '192.168.99.0/24',
-    ipv6Cidr: 'fd00:99:99::/64',
-    secretKey: 'home-edge-token-01',
-    rpcPortal: 'tcp://home.easytier.top:11010',
+    ipv6Cidr: '',
+    secretKey: '',
+    rpcPortal: '',
     relayHubs: [],
-    createdDate: '2026-10-01',
-  },
+    createdDate: new Date().toISOString().split('T')[0],
+  }
 ])
 
 const currentNetworkId = ref<string>('net-default')
@@ -124,26 +98,7 @@ interface NetworkTrafficStats {
   txSpeed: string
 }
 
-const networkTrafficMap = ref<Record<string, NetworkTrafficStats>>({
-  'net-default': {
-    rxTotal: '0 B',
-    txTotal: '0 B',
-    rxSpeed: '0 B/s',
-    txSpeed: '0 B/s',
-  },
-  'net-office': {
-    rxTotal: '1.42 TB',
-    txTotal: '2.85 TB',
-    rxSpeed: '120.5 MB/s',
-    txSpeed: '184.2 MB/s',
-  },
-  'net-homelab': {
-    rxTotal: '54.2 GB',
-    txTotal: '78.1 GB',
-    rxSpeed: '6.4 MB/s',
-    txSpeed: '9.1 MB/s',
-  },
-})
+const networkTrafficMap = ref<Record<string, NetworkTrafficStats>>({})
 
 const currentTraffic = computed(() => {
   return (
@@ -157,6 +112,42 @@ const currentTraffic = computed(() => {
 })
 
 // 专属网络切换面板模态框
+
+const showAddTestModal = ref(false)
+const isRefreshingStun = ref(false)
+const stunServers = ref<any[]>([])
+const showAddStunModal = ref(false)
+const newStunForm = ref({ name: '', host: '', type: 'public' })
+const addStunServer = () => {
+  if (!newStunForm.value.name.trim() || !newStunForm.value.host.trim()) {
+    showToast('请填写 STUN 名称和地址')
+    return
+  }
+  stunServers.value.push({
+    id: `stun-${Date.now()}`,
+    name: newStunForm.value.name,
+    host: newStunForm.value.host,
+    type: newStunForm.value.type === 'public' ? '公共 STUN' : '私有中继',
+    latency: (Math.random() * 50 + 10).toFixed(1)
+  })
+  showAddStunModal.value = false
+  newStunForm.value = { name: '', host: '', type: 'public' }
+  showToast('STUN 节点添加成功')
+}
+const logsList = ref<any[]>([])
+const newTestForm = ref({ name: '', src: '', dst: '' })
+
+const refreshStun = () => {
+  isRefreshingStun.value = true
+  setTimeout(() => { isRefreshingStun.value = false }, 1000)
+}
+const clearLogs = () => {
+  logsList.value = []
+}
+const saveSettings = () => {
+  showToast('Settings saved')
+}
+
 const showNetworkModal = ref(false)
 const showCreateNetworkModal = ref(false)
 const showNetworkSecret = ref(false)
@@ -240,7 +231,7 @@ const advancedSettings = ref({
 
 
 // --- 导航菜单状态定义 ---
-type SubNavItem = 'network-overview' | 'machines' | 'subnets' | 'stun' | 'policies' | 'tests' | 'toml' | 'logs' | 'settings' | 'advanced'
+type SubNavItem = 'network-overview' | 'machines' | 'subnets' | 'stun' | 'policies' | 'tests' | 'toml' | 'logs' | 'settings' | 'advanced' | 'advanced'
 const activeSubNav = ref<SubNavItem>('network-overview')
 
 // 侧边栏折叠状态 (桌面端一键收起，只保留图标)
@@ -307,187 +298,7 @@ const copyText = async (text: string, label: string) => {
 }
 
 // --- 设备节点数据 (含全球 IP 物理经纬度定位信息) ---
-const nodes = ref([
-  {
-    id: 'node-edge-gw',
-    hostname: 'hk-gateway-edge',
-    domain: 'hk-gateway-edge.easytier.local',
-    os: 'Ubuntu 24.04 LTS (x86_64)',
-    osType: 'linux',
-    locationName: '中国香港特别行政区',
-    countryCode: 'HK',
-    publicIp: '203.0.113.195',
-    lat: 22.3193,
-    lng: 114.1694,
-    ipv4: '10.144.144.1',
-    ipv6: 'fd00:144:144::1',
-    status: 'online' as const,
-    connection: '直连 P2P',
-    connectionMode: 'p2p' as ConnectionMode,
-    natType: 'Full Cone NAT (全锥形)',
-    latencyMs: 14,
-    lastSeen: '实时在线',
-    subnets: ['192.168.10.0/24'],
-    isSubnetApproved: true,
-    isExitNode: true,
-    tags: ['tag:网关', 'tag:生产'],
-    keyExpiry: '永久有效',
-    easytierVersion: 'v2.2.0',
-    listeners: ['tcp://0.0.0.0:11010', 'udp://0.0.0.0:11010', 'wg://0.0.0.0:11011'],
-    peersList: [
-      { name: 'mbp-m3-workstation', ip: '10.144.144.2', mode: '直连 (STUN UDP 打洞)', latency: '24ms', rx: '14.2 MB', tx: '88.5 MB' },
-      { name: 'office-nas-storage', ip: '10.144.144.10', mode: '中继 (经由香港中继节点)', latency: '78ms', rx: '1.2 GB', tx: '450 MB' },
-    ],
-  },
-  {
-    id: 'node-workstation-mac',
-    hostname: 'mbp-m3-workstation',
-    domain: 'mbp-m3-workstation.easytier.local',
-    os: 'macOS Sequoia 15.1 (Apple Silicon)',
-    osType: 'macos',
-    locationName: '日本东京千代田区',
-    countryCode: 'JP',
-    publicIp: '198.51.100.42',
-    lat: 35.6762,
-    lng: 139.6503,
-    ipv4: '10.144.144.2',
-    ipv6: 'fd00:144:144::2',
-    status: 'online' as const,
-    connection: '直连 P2P',
-    connectionMode: 'p2p' as ConnectionMode,
-    natType: 'Restricted Cone NAT (受限锥形)',
-    latencyMs: 24,
-    lastSeen: '实时在线',
-    subnets: [],
-    isSubnetApproved: false,
-    isExitNode: false,
-    tags: ['tag:开发机', 'tag:移动办公'],
-    keyExpiry: '88 天后到期',
-    easytierVersion: 'v2.2.0',
-    listeners: ['tcp://0.0.0.0:11010', 'udp://0.0.0.0:11010'],
-    peersList: [
-      { name: 'hk-gateway-edge', ip: '10.144.144.1', mode: '直连 (STUN UDP 打洞)', latency: '24ms', rx: '88.5 MB', tx: '14.2 MB' },
-    ],
-  },
-  {
-    id: 'node-nas-storage',
-    hostname: 'office-nas-storage',
-    domain: 'office-nas-storage.easytier.local',
-    os: 'Debian GNU/Linux 12 (bookworm)',
-    osType: 'linux',
-    locationName: '中国上海浦东新区',
-    countryCode: 'CN',
-    publicIp: '202.96.209.133',
-    lat: 31.2304,
-    lng: 121.4737,
-    ipv4: '10.144.144.10',
-    ipv6: 'fd00:144:144::10',
-    status: 'online' as const,
-    connection: '中继转发',
-    connectionMode: 'relay' as ConnectionMode,
-    natType: 'Symmetric NAT (对称型)',
-    latencyMs: 78,
-    lastSeen: '实时在线',
-    subnets: ['10.0.0.0/16'],
-    isSubnetApproved: true,
-    isExitNode: false,
-    tags: ['tag:存储', 'tag:备份'],
-    keyExpiry: '永久有效',
-    easytierVersion: 'v2.1.8',
-    listeners: ['tcp://0.0.0.0:11010'],
-    peersList: [
-      { name: 'hk-gateway-edge', ip: '10.144.144.1', mode: '中继 (节点协同转发)', latency: '78ms', rx: '450 MB', tx: '1.2 GB' },
-    ],
-  },
-  {
-    id: 'node-win-pc',
-    hostname: 'win11-workstation',
-    domain: 'win11-workstation.easytier.local',
-    os: 'Windows 11 Pro 24H2',
-    osType: 'windows',
-    locationName: '美国加州圣何塞',
-    countryCode: 'US',
-    publicIp: '192.0.2.88',
-    lat: 37.3861,
-    lng: -122.0839,
-    ipv4: '10.144.144.15',
-    ipv6: 'fd00:144:144::15',
-    status: 'offline' as const,
-    connection: '已断开',
-    connectionMode: 'disconnected' as ConnectionMode,
-    natType: '未知',
-    latencyMs: 0,
-    lastSeen: '2 小时前',
-    subnets: [],
-    isSubnetApproved: false,
-    isExitNode: false,
-    tags: ['tag:办公桌面'],
-    keyExpiry: '已过期',
-    easytierVersion: 'v2.1.7',
-    listeners: ['udp://0.0.0.0:11010'],
-    peersList: [],
-  },
-  {
-    id: 'node-sg-relay',
-    hostname: 'sg-edge-relay',
-    domain: 'sg-edge-relay.easytier.local',
-    os: 'Ubuntu 24.04 LTS (x86_64)',
-    osType: 'linux',
-    locationName: '新加坡特别节点',
-    countryCode: 'SG',
-    publicIp: '103.28.248.1',
-    lat: 1.3521,
-    lng: 103.8198,
-    ipv4: '10.144.144.5',
-    ipv6: 'fd00:144:144::5',
-    status: 'online' as const,
-    connection: '直连 P2P',
-    connectionMode: 'p2p' as ConnectionMode,
-    natType: 'Full Cone NAT (全锥形)',
-    latencyMs: 32,
-    lastSeen: '实时在线',
-    subnets: [],
-    isSubnetApproved: false,
-    isExitNode: false,
-    tags: ['tag:亚太边缘', 'tag:中继通道'],
-    keyExpiry: '永久有效',
-    easytierVersion: 'v2.2.0',
-    listeners: ['tcp://0.0.0.0:11010', 'udp://0.0.0.0:11010'],
-    peersList: [
-      { name: 'hk-gateway-edge', ip: '10.144.144.1', mode: '直连 (STUN UDP 打洞)', latency: '32ms', rx: '24.1 MB', tx: '18.9 MB' },
-    ],
-  },
-  {
-    id: 'node-fra-hub',
-    hostname: 'fra-cloud-hub',
-    domain: 'fra-cloud-hub.easytier.local',
-    os: 'Debian GNU/Linux 12',
-    osType: 'linux',
-    locationName: '德国法兰克福云中继',
-    countryCode: 'DE',
-    publicIp: '194.12.45.101',
-    lat: 50.1109,
-    lng: 8.6821,
-    ipv4: '10.144.144.8',
-    ipv6: 'fd00:144:144::8',
-    status: 'online' as const,
-    connection: '中继转发',
-    connectionMode: 'relay' as ConnectionMode,
-    natType: 'Restricted Cone NAT (受限锥形)',
-    latencyMs: 145,
-    lastSeen: '实时在线',
-    subnets: [],
-    isSubnetApproved: false,
-    isExitNode: true,
-    tags: ['tag:欧洲出口', 'tag:数据中心'],
-    keyExpiry: '永久有效',
-    easytierVersion: 'v2.2.0',
-    listeners: ['tcp://0.0.0.0:11010'],
-    peersList: [
-      { name: 'hk-gateway-edge', ip: '10.144.144.1', mode: '中继 (骨干互联)', latency: '145ms', rx: '4.2 MB', tx: '12.1 MB' },
-    ],
-  },
-])
+const nodes = ref<any[]>([])
 
 // 转换为 3D 球形地图需要的设备格式
 const globeDevices = computed<GlobeDevice[]>(() => {
@@ -576,7 +387,7 @@ const filteredNodes = computed(() => {
         n.ipv4.includes(q) ||
         n.ipv6.toLowerCase().includes(q) ||
         n.locationName.includes(q) ||
-        n.tags.some((t) => t.toLowerCase().includes(q))
+        n.tags.some((t: string) => t.toLowerCase().includes(q))
       )
     }
     return true
@@ -607,40 +418,25 @@ const saveDrawerChanges = () => {
   showToast(`已成功保存节点 ${activeNode.value.hostname} 的网络与子网配置`)
 }
 
-// 模拟添加新节点
-const addNewMockDevice = () => {
-  const newId = `node-${Date.now().toString().slice(-4)}`
-  const newNode = {
-    id: newId,
-    hostname: `node-sg-${nodes.value.length + 1}`,
-    domain: `node-sg-${nodes.value.length + 1}.mesh.local`,
-    os: 'Linux (x86_64)',
-    osType: 'linux',
-    locationName: '新加坡中央区',
-    countryCode: 'SG',
-    publicIp: '103.28.248.1',
-    lat: 1.3521,
-    lng: 103.8198,
-    ipv4: `10.144.144.${nodes.value.length + 20}`,
-    ipv6: `fd00:144:144::${nodes.value.length + 20}`,
-    status: 'online' as const,
-    connection: '直连 P2P',
-    connectionMode: 'p2p' as ConnectionMode,
-    natType: 'Full Cone NAT',
-    latencyMs: 18,
-    lastSeen: '实时在线',
-    subnets: [],
-    isSubnetApproved: false,
-    isExitNode: false,
-    tags: ['tag:新加坡中继'],
-    keyExpiry: '永久有效',
-    easytierVersion: 'v2.2.0',
-    listeners: ['tcp://0.0.0.0:11010'],
-    peersList: [],
+// 模拟添加新节点 (已移除)
+const addTestCase = () => {
+  if (!newTestForm.value.name.trim() || !newTestForm.value.src.trim() || !newTestForm.value.dst.trim()) {
+    showToast('请填写完整的测试用例信息')
+    return
   }
-  nodes.value.unshift(newNode)
-  showAddDeviceModal.value = false
-  showToast(`设备 ${newNode.hostname} (新加坡) 已成功加入当前网络！`)
+  aclTests.value.push({
+    id: `test-${Date.now()}`,
+    name: newTestForm.value.name,
+    src: newTestForm.value.src,
+    dst: newTestForm.value.dst,
+    action: '-',
+    ruleMatched: '-',
+    latency: '-',
+    status: 'pending'
+  })
+  showAddTestModal.value = false
+  newTestForm.value = { name: '', src: '', dst: '' }
+  showToast('测试用例添加成功')
 }
 
 
@@ -663,6 +459,7 @@ const deleteNetwork = (id: string, name: string) => {
 // 新建网络提交
 const createNewNetwork = () => {
 
+
   if (!newNetworkForm.value.name.trim()) return
   const newNet: ManagedNetwork = {
     id: `net-${Date.now().toString().slice(-4)}`,
@@ -673,7 +470,7 @@ const createNewNetwork = () => {
     ipv4Cidr: newNetworkForm.value.ipv4Cidr,
     ipv6Cidr: newNetworkForm.value.ipv6Cidr,
     secretKey: newNetworkForm.value.secretKey || `token-${Date.now().toString().slice(-6)}`,
-    rpcPortal: 'tcp://hub.easytier.top:11010',
+    rpcPortal: 'tcp://hub.example.com:11010',
     relayHubs: [],
     createdDate: new Date().toISOString().split('T')[0],
   }
@@ -683,58 +480,174 @@ const createNewNetwork = () => {
   showToast(`虚拟网络 ${newNet.name} 已成功创建并切换为主控网络！`)
 }
 
+
+
+// --- 子网路由 (Proxy CIDR) 逻辑 ---
+interface SubnetRoute {
+  id: string
+  cidr: string
+  nodeId: string
+  gatewayName: string
+  gatewayIp: string
+  status: string
+  metric: number
+}
+
+const subnetRoutes = computed<SubnetRoute[]>(() => {
+  const routes: SubnetRoute[] = []
+  nodes.value.forEach(node => {
+    if (Array.isArray(node.subnets)) {
+      node.subnets.forEach((cidr: string, idx: number) => {
+        routes.push({
+          id: `${node.id}-${idx}`,
+          cidr: cidr,
+          nodeId: node.id,
+          gatewayName: node.hostname,
+          gatewayIp: node.ipv4 || node.publicIp || 'Unknown',
+          status: node.isSubnetApproved !== false ? '已放行 (Approved)' : '待审批 (Pending)',
+          metric: node.latencyMs < 50 ? 1 : 2
+        })
+      })
+    }
+  })
+  return routes
+})
+
+const showAddSubnetModal = ref(false)
+const newSubnetForm = ref({ cidr: '', nodeId: '' })
+
+const addSubnetRoute = () => {
+  if (!newSubnetForm.value.cidr || !newSubnetForm.value.nodeId) {
+    showToast('请填写子网 CIDR 并选择网关节点')
+    return
+  }
+  const targetNode = nodes.value.find(n => n.id === newSubnetForm.value.nodeId)
+  if (targetNode) {
+    if (!Array.isArray(targetNode.subnets)) targetNode.subnets = []
+    if (targetNode.subnets.includes(newSubnetForm.value.cidr)) {
+      showToast('该子网路由已存在于选定节点中')
+      return
+    }
+    targetNode.subnets.push(newSubnetForm.value.cidr)
+    showToast(`已成功为节点 ${targetNode.hostname} 添加子网路由 ${newSubnetForm.value.cidr}`)
+    showAddSubnetModal.value = false
+    newSubnetForm.value.cidr = ''
+    newSubnetForm.value.nodeId = ''
+  } else {
+    showToast('未找到选定的网关节点')
+  }
+}
+
+// --- ACL Policies 访问控制策略 ---
+interface AclPolicy {
+  id: string
+  name: string
+  src: string
+  dst: string
+  action: 'allow' | 'deny'
+  priority: number
+  enabled: boolean
+}
+
+const aclPolicies = ref<AclPolicy[]>([])
+
+const aclConflicts = computed(() => {
+  const conflicts: { rule1: string, rule2: string, reason: string }[] = []
+  const activeRules = aclPolicies.value.filter(r => r.enabled).sort((a, b) => a.priority - b.priority)
+  
+  for (let i = 0; i < activeRules.length; i++) {
+    for (let j = i + 1; j < activeRules.length; j++) {
+      const r1 = activeRules[i]
+      const r2 = activeRules[j]
+      
+      // Simple conflict detection logic: same src and dst but different actions, or overlapping CIDRs
+      const srcOverlap = r1.src === r2.src || r1.src === '0.0.0.0/0' || r2.src === '0.0.0.0/0'
+      const dstOverlap = r1.dst === r2.dst || r1.dst === '*:*' || r2.dst === '*:*'
+      
+      if (srcOverlap && dstOverlap && r1.action !== r2.action) {
+         conflicts.push({
+           rule1: r1.name,
+           rule2: r2.name,
+           reason: `源 "${r1.src}" 与目标 "${r1.dst}" 范围重叠但动作冲突。高优先级规则 "${r1.name}" 将覆盖 "${r2.name}"。`
+         })
+      }
+    }
+  }
+  return conflicts
+})
+
+const editingPolicy = ref<AclPolicy | null>(null)
+const showPolicyModal = ref(false)
+
+const savePolicy = () => {
+  if (editingPolicy.value) {
+    if (!editingPolicy.value.id) {
+       editingPolicy.value.id = `rule-${Date.now()}`
+       aclPolicies.value.push({...editingPolicy.value} as AclPolicy)
+    } else {
+       const idx = aclPolicies.value.findIndex(r => r.id === editingPolicy.value!.id)
+       if (idx !== -1) {
+         aclPolicies.value[idx] = {...editingPolicy.value} as AclPolicy
+       }
+    }
+  }
+  showPolicyModal.value = false
+  showToast('访问控制策略已保存')
+}
+
+const deletePolicy = (id: string) => {
+  aclPolicies.value = aclPolicies.value.filter(r => r.id !== id)
+  showToast('策略规则已删除')
+}
+
 // --- ACL Tests 规则验证数据 ---
-const aclTests = ref([
-  {
-    id: 'test-1',
-    name: '开发机访问预发布数据库集群',
-    src: 'tag:开发人员',
-    dst: 'tag:测试数据库:5432',
-    action: '放行',
-    status: '通过',
-    latency: '1.2ms',
-    ruleMatched: '规则 #3: allow-dev-to-staging',
-  },
-  {
-    id: 'test-2',
-    name: '阻断普通开发节点直连生产核心库',
-    src: 'tag:开发人员',
-    dst: 'tag:核心数据库:5432',
-    action: '阻断',
-    status: '通过',
-    latency: '0.8ms',
-    ruleMatched: '规则 #1: default-deny-prod',
-  },
-  {
-    id: 'test-3',
-    name: 'CI/CD 自动化节点部署至 Kubernetes 控制面',
-    src: 'tag:构建节点',
-    dst: 'tag:k8s集群控制面:6443',
-    action: '放行',
-    status: '通过',
-    latency: '2.1ms',
-    ruleMatched: '规则 #7: cicd-k8s-apiserver',
-  },
-  {
-    id: 'test-4',
-    name: '隔离访客办公 WiFi 访问内网 NAS 存储',
-    src: 'tag:访客网络',
-    dst: 'tag:局域网存储:*',
-    action: '阻断',
-    status: '通过',
-    latency: '0.4ms',
-    ruleMatched: '规则 #2: isolate-guests',
-  },
-])
+const aclTests = ref<any[]>([])
 
 const isRunningTests = ref(false)
 const runAllTests = () => {
   isRunningTests.value = true
-  showToast('正在执行 EasyTier 数据包过滤规则断言测试...')
+  showToast('正在执行 数据包过滤规则断言测试...')
+  
   setTimeout(() => {
+    // 动态执行测试，根据 aclPolicies 模拟路由过滤
+    aclTests.value.forEach(test => {
+       const matchedRule = aclPolicies.value.find(r => 
+         r.enabled && 
+         (r.src === test.src || r.src === '0.0.0.0/0') && 
+         (r.dst === test.dst || r.dst === '*:*')
+       )
+       
+       if (matchedRule) {
+         test.action = matchedRule.action === 'allow' ? '放行' : '阻断'
+         test.ruleMatched = `规则 #${matchedRule.priority}: ${matchedRule.name}`
+       } else {
+         test.action = '放行'
+         test.ruleMatched = '默认放行'
+       }
+       test.status = '通过'
+       test.latency = (Math.random() * 2 + 0.1).toFixed(1) + 'ms'
+    })
+    
     isRunningTests.value = false
-    showToast('全部 ACL 安全策略校验通过：4 项通过，0 项失败')
+    showToast(`全部 ACL 安全策略校验完成：${aclTests.value.length} 项测试完毕`)
   }, 750)
+}
+
+// --- TOML Editor State ---
+const tomlContent = ref(`[network_identity]
+network_name = "${currentNetwork.value.name}"
+network_secret = "${currentNetwork.value.secretKey}"
+
+[vpn_portal]
+ipv4 = "${currentNetwork.value.ipv4Cidr}"
+ipv6 = "${currentNetwork.value.ipv6Cidr}"
+
+[feature]
+enable_stun_turn = true
+enable_encryption = true`)
+
+const saveTomlConfig = () => {
+  showToast('TOML 配置文件已成功应用并保存至本地')
 }
 </script>
 
@@ -1025,7 +938,7 @@ const runAllTests = () => {
         <div class="w-6 border-t border-gray-200 dark:border-[#333232] my-1"></div>
         <button
           type="button"
-          @click="showToast('打开 EasyTier 官方技术文档')"
+          @click="showToast('打开 官方技术文档')"
           title="使用文档"
           class="w-10 h-10 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200/60 dark:hover:bg-gray-800 transition-colors cursor-pointer"
         >
@@ -1267,11 +1180,27 @@ const runAllTests = () => {
           <span>高级节点功能</span>
         </button>
 
+        
+        <!-- 6. 高级节点功能 -->
+        <button
+          type="button"
+          @click="activeSubNav = 'advanced'; mobileMenuOpen = false"
+          :class="[
+            'flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-md font-normal text-left transition-all duration-100 active:scale-[0.98] cursor-pointer',
+            activeSubNav === 'advanced'
+              ? 'bg-[#ebebeb] dark:bg-[#2e2d2d] text-gray-900 dark:text-white font-medium'
+              : 'text-gray-800 dark:text-gray-200 hover:bg-gray-200/60 dark:hover:bg-gray-800'
+          ]"
+        >
+          <Wrench class="w-4 h-4 text-gray-700 dark:text-gray-300" />
+          <span>高级节点功能</span>
+        </button>
+
         <!-- 底部帮助与文档 -->
         <div class="pt-4 mt-4 border-t border-gray-200 dark:border-[#2f2e2e] space-y-0.5">
           <a
             href="javascript:void(0)"
-            @click="showToast('打开 EasyTier 官方技术文档')"
+            @click="showToast('打开 官方技术文档')"
             class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-xs font-normal text-gray-600 dark:text-gray-400 hover:bg-gray-200/60 dark:hover:bg-gray-800 active:scale-[0.98] transition-all"
           >
             <BookOpen class="w-4 h-4 text-gray-400" />
@@ -1770,9 +1699,9 @@ const runAllTests = () => {
               <span class="text-xs text-gray-400 font-mono">所属网络: {{ currentNetwork.name }}</span>
             </div>
             <p class="mt-1.5 text-sm text-gray-600 dark:text-gray-400 max-w-xl">
-              管理加入当前 EasyTier 虚拟局域网的全部设备与路由器。
+              管理加入当前虚拟局域网的全部设备与路由器。
               <a
-                href="https://easytier.top"
+                href="https://example.com"
                 target="_blank"
                 rel="noopener"
                 class="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-0.5 ml-1"
@@ -1810,7 +1739,7 @@ const runAllTests = () => {
             </button>
 
             <div class="grid grid-cols-1 md:grid-cols-12 items-center">
-              <div class="md:col-span-7 p-6 sm:p-7 flex flex-col justify-center gap-3.5">
+              <div class="md:col-span-12 p-6 sm:p-7 flex flex-col justify-center gap-3.5">
                 <h4 class="font-semibold text-lg text-gray-900 dark:text-white">
                   接入您的第一台设备
                 </h4>
@@ -1820,15 +1749,15 @@ const runAllTests = () => {
 
                 <ol class="space-y-2.5 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
                   <li class="flex items-start gap-2.5">
-                    <span class="flex shrink-0 items-center justify-center rounded-full bg-gray-700 dark:bg-gray-300 text-white dark:text-gray-900 text-xs font-bold w-4.5 h-4.5 mt-0.5">1</span>
-                    <span>在第一台设备（如家庭服务器或 NAS）上安装并启动 EasyTier 核心。</span>
+                    <span class="flex shrink-0 items-center justify-center rounded-full bg-gray-700 dark:bg-gray-300 text-white dark:text-gray-900 text-xs font-bold w-5 h-5 mt-0.5">1</span>
+                    <span>在第一台设备（如家庭服务器或 NAS）上安装并启动 Mesh 核心。</span>
                   </li>
                   <li class="flex items-start gap-2.5">
-                    <span class="flex shrink-0 items-center justify-center rounded-full bg-gray-700 dark:bg-gray-300 text-white dark:text-gray-900 text-xs font-bold w-4.5 h-4.5 mt-0.5">2</span>
+                    <span class="flex shrink-0 items-center justify-center rounded-full bg-gray-700 dark:bg-gray-300 text-white dark:text-gray-900 text-xs font-bold w-5 h-5 mt-0.5">2</span>
                     <span>在另一台设备（如笔记本或云主机）上使用相同的网络名称加入网络。</span>
                   </li>
                   <li class="flex items-start gap-2.5">
-                    <span class="flex shrink-0 items-center justify-center rounded-full bg-gray-700 dark:bg-gray-300 text-white dark:text-gray-900 text-xs font-bold w-4.5 h-4.5 mt-0.5">3</span>
+                    <span class="flex shrink-0 items-center justify-center rounded-full bg-gray-700 dark:bg-gray-300 text-white dark:text-gray-900 text-xs font-bold w-5 h-5 mt-0.5">3</span>
                     <span class="font-medium text-gray-900 dark:text-white">自动完成打洞并建立点对点直连，随时随地极速访问！</span>
                   </li>
                 </ol>
@@ -1845,39 +1774,7 @@ const runAllTests = () => {
                 </div>
               </div>
 
-              <!-- Tailscale 矢量几何波浪艺术图 -->
-              <div class="hidden md:flex md:col-span-5 h-full items-end justify-end overflow-hidden p-2">
-                <svg width="280" height="175" viewBox="0 0 325 195" fill="none" xmlns="http://www.w3.org/2000/svg" class="dark:hidden select-none">
-                  <path d="M259.465 194.6C223.632 194.6 194.598 165.566 194.598 129.733L259.465 129.733L259.465 194.6Z" fill="#ADC7FC"/>
-                  <path d="M324.331 129.733C324.331 165.566 295.296 194.6 259.464 194.6L259.464 129.733L324.331 129.733Z" fill="#ADC7FC"/>
-                  <path d="M324.334 64.8668C324.334 100.699 295.3 129.733 259.467 129.733L259.467 64.8668L324.334 64.8668Z" fill="#ADC7FC"/>
-                  <path d="M64.8657 129.733C64.8657 93.901 93.9 64.8667 129.732 64.8667L129.732 129.733L64.8657 129.733Z" fill="#6C94EC"/>
-                  <path d="M194.601 129.733C194.601 165.566 165.566 194.6 129.734 194.6L129.734 129.733L194.601 129.733Z" fill="#6C94EC"/>
-                  <path d="M324.334 0C324.334 35.8324 295.3 64.8667 259.467 64.8667L259.467 7.73527e-07L324.334 0Z" fill="#6C94EC"/>
-                  <path d="M324.334 129.733C324.334 165.566 295.3 194.6 259.467 194.6L259.467 129.733L324.334 129.733Z" fill="#6C94EC"/>
-                  <rect x="194.601" y="64.8668" width="64.8667" height="64.8667" rx="32.4333" fill="#6C94EC"/>
-                  <rect x="194.601" width="64.8667" height="64.8667" rx="32.4333" fill="#ADC7FC"/>
-                  <rect x="64.8657" y="129.733" width="64.8667" height="64.8667" rx="32.4333" fill="#ADC7FC"/>
-                  <rect y="129.733" width="64.8667" height="64.8667" rx="32.4333" fill="#6C94EC"/>
-                  <rect x="129.733" y="64.8668" width="64.8667" height="64.8667" rx="32.4333" fill="#ADC7FC"/>
-                </svg>
-
-                <svg width="280" height="175" viewBox="0 0 324 195" fill="none" xmlns="http://www.w3.org/2000/svg" class="hidden dark:block select-none">
-                  <path d="M259.198 194.4C223.402 194.4 194.398 165.396 194.398 129.6L259.198 129.6L259.198 194.4Z" fill="#3F5DB3"/>
-                  <path d="M323.997 129.6C323.997 165.395 294.993 194.4 259.197 194.4L259.197 129.6L323.997 129.6Z" fill="#3F5DB3"/>
-                  <path d="M324 64.8001C324 100.596 294.996 129.6 259.2 129.6L259.2 64.8001L324 64.8001Z" fill="#3F5DB3"/>
-                  <path d="M64.7993 129.6C64.7993 93.8045 93.8038 64.8 129.599 64.8L129.599 129.6L64.7993 129.6Z" fill="#6C94EC"/>
-                  <path d="M194.4 129.6C194.4 165.396 165.396 194.4 129.6 194.4L129.6 129.6L194.4 129.6Z" fill="#6C94EC"/>
-                  <path d="M324 0C324 35.7955 294.996 64.8 259.2 64.8L259.2 7.72732e-07L324 0Z" fill="#6C94EC"/>
-                  <path d="M324 129.6C324 165.396 294.996 194.4 259.2 194.4L259.2 129.6L324 129.6Z" fill="#6C94EC"/>
-                  <rect x="194.4" y="64.8001" width="64.8" height="64.8" rx="32.4" fill="#6C94EC"/>
-                  <rect x="194.4" width="64.8" height="64.8" rx="32.4" fill="#3F5DB3"/>
-                  <rect x="64.7993" y="129.6" width="64.8" height="64.8" rx="32.4" fill="#3F5DB3"/>
-                  <rect y="129.6" width="64.8" height="64.8" rx="32.4" fill="#6C94EC"/>
-                  <rect x="129.6" y="64.8001" width="64.8" height="64.8" rx="32.4" fill="#3F5DB3"/>
-                </svg>
               </div>
-            </div>
           </div>
         </section>
 
@@ -2167,12 +2064,102 @@ const runAllTests = () => {
             <span>当前显示 {{ filteredNodes.length }} 台设备（共 {{ nodes.length }} 台）</span>
             <span class="flex items-center gap-1.5">
               <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-              EasyTier Mesh 拓扑网络全连通 · 0 丢包
+              Mesh 拓扑网络全连通 · 0 丢包
             </span>
           </div>
         </div>
 
       </main>
+
+
+      <!-- -------------------- 视图 X: 访问控制策略 (ACL) 面板 -------------------- -->
+      <main v-else-if="activeSubNav === 'policies'" class="w-full mx-auto pb-20 pt-6 px-4 sm:px-8 lg:px-10 max-w-6xl space-y-6">
+        <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-gray-200 dark:border-[#2f2e2e]">
+          <div>
+            <div class="flex items-center gap-3">
+              <h1 class="text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">
+                访问控制 (ACL) 策略
+              </h1>
+            </div>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              配置细粒度的 P2P 网络访问控制规则。支持按 Tag、IP、子网 CIDR 进行流量放行或阻断。
+            </p>
+          </div>
+          <button
+            @click="editingPolicy = { id: '', name: '', src: '', dst: '', action: 'allow', priority: 100, enabled: true }; showPolicyModal = true"
+            class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors active:scale-95 whitespace-nowrap"
+          >
+            <Plus class="w-4 h-4" />
+            新建策略规则
+          </button>
+        </header>
+
+        <!-- 冲突检测警告面板 -->
+        <div v-if="aclConflicts.length > 0" class="p-4 bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-900/50 rounded-xl">
+          <div class="flex items-start gap-3">
+            <AlertCircle class="w-5 h-5 text-orange-600 dark:text-orange-400 shrink-0 mt-0.5" />
+            <div>
+              <h3 class="text-sm font-bold text-orange-800 dark:text-orange-300">检测到策略规则冲突 ({{ aclConflicts.length }} 项)</h3>
+              <ul class="mt-2 space-y-1">
+                <li v-for="(conflict, idx) in aclConflicts" :key="idx" class="text-xs text-orange-700 dark:text-orange-400 list-disc ml-4">
+                  {{ conflict.reason }}
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- 规则列表 -->
+        <div class="bg-white dark:bg-[#252424] rounded-xl border border-gray-200 dark:border-[#333232] shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-gray-50/50 dark:bg-[#1f1e1e] border-b border-gray-200 dark:border-[#333232]">
+                  <th class="px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400">优先级</th>
+                  <th class="px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400">规则名称</th>
+                  <th class="px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400">匹配源 (Source)</th>
+                  <th class="px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400">目标 (Destination)</th>
+                  <th class="px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400">动作 (Action)</th>
+                  <th class="px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400">状态</th>
+                  <th class="px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 text-right">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 dark:divide-[#333232]">
+                <tr v-for="policy in aclPolicies" :key="policy.id" class="hover:bg-gray-50/50 dark:hover:bg-[#2a2929] transition-colors">
+                  <td class="px-4 py-3 text-sm font-mono text-gray-900 dark:text-gray-100">{{ policy.priority }}</td>
+                  <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{{ policy.name }}</td>
+                  <td class="px-4 py-3 text-sm font-mono text-blue-600 dark:text-blue-400 bg-blue-50/30 dark:bg-blue-900/10 rounded">{{ policy.src }}</td>
+                  <td class="px-4 py-3 text-sm font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-50/30 dark:bg-emerald-900/10 rounded">{{ policy.dst }}</td>
+                  <td class="px-4 py-3 text-sm">
+                    <span :class="['px-2 py-1 rounded text-xs font-medium', policy.action === 'allow' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400']">
+                      {{ policy.action === 'allow' ? '放行 (Allow)' : '阻断 (Deny)' }}
+                    </span>
+                  </td>
+                  <td class="px-4 py-3">
+                    <button @click="policy.enabled = !policy.enabled" :class="['relative inline-flex h-5 w-9 items-center rounded-full transition-colors', policy.enabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600']">
+                      <span :class="['inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform', policy.enabled ? 'translate-x-4' : 'translate-x-1']"></span>
+                    </button>
+                  </td>
+                  <td class="px-4 py-3 text-right">
+                    <button @click="editingPolicy = {...policy}; showPolicyModal = true" class="p-1.5 text-gray-500 hover:text-blue-600 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors mr-2">
+                      <Sliders class="w-4 h-4" />
+                    </button>
+                    <button @click="deletePolicy(policy.id)" class="p-1.5 text-gray-500 hover:text-red-600 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                      <X class="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+                <tr v-if="aclPolicies.length === 0">
+                  <td colspan="7" class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                    暂无访问控制策略，网络默认为全互通状态
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+
 
       <!-- -------------------- 视图 3: ACL 规则测试面板 -------------------- -->
       <main v-else-if="activeSubNav === 'tests'" class="w-full mx-auto pb-20 pt-6 px-4 sm:px-8 lg:px-10 max-w-6xl">
@@ -2187,7 +2174,7 @@ const runAllTests = () => {
               </span>
             </div>
             <p class="mt-1.5 text-sm text-gray-600 dark:text-gray-400 max-w-xl">
-              编写测试断言，验证 EasyTier 数据包过滤规则与安全标签是否符合预期。
+              编写测试断言，验证数据包过滤规则与安全标签是否符合预期。
             </p>
           </div>
 
@@ -2203,7 +2190,7 @@ const runAllTests = () => {
               <span>运行全部测试</span>
             </button>
             <button
-              @click="showToast('添加新的 ACL 访问控制测试用例')"
+              @click="showAddTestModal = true"
               type="button"
               class="inline-flex items-center gap-2 px-3.5 h-9 rounded-md bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 text-white font-medium text-sm transition-all shadow-2xs active:scale-[0.98] cursor-pointer"
             >
@@ -2281,9 +2268,9 @@ const runAllTests = () => {
         <header class="flex items-center justify-between pb-6 border-b border-gray-200 dark:border-[#2f2e2e]">
           <div>
             <h1 class="text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">子网路由代理 (Proxy CIDR)</h1>
-            <p class="mt-1.5 text-sm text-gray-600 dark:text-gray-400">将物理局域网网段宣告给 EasyTier 虚拟网中的其他节点跨网互联。</p>
+            <p class="mt-1.5 text-sm text-gray-600 dark:text-gray-400">将物理局域网网段宣告给虚拟网中的其他节点跨网互联。</p>
           </div>
-          <button @click="showToast('添加新的子网路由广播')" type="button" class="px-3.5 h-9 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm shadow-2xs">
+          <button @click="showAddSubnetModal = true" type="button" class="px-3.5 h-9 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm shadow-2xs cursor-pointer active:scale-95 transition-all">
             添加子网路由
           </button>
         </header>
@@ -2299,17 +2286,16 @@ const runAllTests = () => {
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-[#282727]">
-              <tr>
-                <td class="py-3 px-4 font-mono font-bold text-blue-600">192.168.10.0/24</td>
-                <td class="py-3 px-4 font-semibold text-gray-900 dark:text-white">hk-gateway-edge (10.144.144.1)</td>
-                <td class="py-3 px-4 text-emerald-600 font-semibold">● 已放行 (Approved)</td>
-                <td class="py-3 px-4 font-mono text-gray-500">Metric: 1 (直连)</td>
+              <tr v-for="route in subnetRoutes" :key="route.id" class="hover:bg-gray-50/50 dark:hover:bg-[#2a2929] transition-colors">
+                <td class="py-3 px-4 font-mono font-bold text-blue-600 dark:text-blue-400">{{ route.cidr }}</td>
+                <td class="py-3 px-4 font-semibold text-gray-900 dark:text-white">{{ route.gatewayName }} ({{ route.gatewayIp }})</td>
+                <td class="py-3 px-4 font-semibold" :class="route.status.includes('Approved') ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'">
+                  ● {{ route.status }}
+                </td>
+                <td class="py-3 px-4 font-mono text-gray-500 dark:text-gray-400">Metric: {{ route.metric }}</td>
               </tr>
-              <tr>
-                <td class="py-3 px-4 font-mono font-bold text-blue-600">10.0.0.0/16</td>
-                <td class="py-3 px-4 font-semibold text-gray-900 dark:text-white">office-nas-storage (10.144.144.10)</td>
-                <td class="py-3 px-4 text-emerald-600 font-semibold">● 已放行 (Approved)</td>
-                <td class="py-3 px-4 font-mono text-gray-500">Metric: 2 (中继)</td>
+              <tr v-if="subnetRoutes.length === 0">
+                <td colspan="4" class="py-8 text-center text-sm text-gray-500 dark:text-gray-400">暂无子网路由广播，请点击右上角添加。</td>
               </tr>
             </tbody>
           </table>
@@ -2321,29 +2307,32 @@ const runAllTests = () => {
         <header class="flex items-center justify-between pb-6 border-b border-gray-200 dark:border-[#2f2e2e]">
           <div>
             <h1 class="text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">STUN 穿透与中继节点</h1>
-            <p class="mt-1.5 text-sm text-gray-600 dark:text-gray-400">管理 EasyTier 用于 NAT 探测穿透的公共与私有 STUN 服务器及中继节点集群。</p>
+            <p class="mt-1.5 text-sm text-gray-600 dark:text-gray-400">管理用于 NAT 探测穿透的公共与私有 STUN 服务器及中继节点集群。</p>
           </div>
-          <button @click="showToast('刷新 STUN 探测握手')" type="button" class="px-3.5 h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm">
-            重新探测 STUN 延迟
-          </button>
+          <div class="flex items-center gap-3">
+            <button @click="refreshStun" :disabled="isRefreshingStun" type="button" class="inline-flex items-center gap-2 px-3.5 h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer disabled:opacity-50">
+              <RotateCw class="w-3.5 h-3.5" :class="{ 'animate-spin': isRefreshingStun }" />
+              重新探测 STUN 延迟
+            </button>
+            <button @click="showAddStunModal = true" type="button" class="px-3.5 h-9 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm shadow-2xs cursor-pointer active:scale-95 transition-all">
+              添加 STUN
+            </button>
+          </div>
         </header>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div class="p-4 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] space-y-1">
-            <span class="text-xs text-gray-400">官方默认 STUN 探测点</span>
-            <div class="font-mono text-sm font-bold text-gray-900 dark:text-white">stun.easytier.top:3478</div>
-            <span class="text-xs text-emerald-600">正常握手 · 18ms 延迟</span>
+          <div v-for="stun in stunServers" :key="stun.id" class="p-4 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="text-xs text-gray-500 dark:text-gray-400">{{ stun.name }}</span>
+              <span class="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded">{{ stun.type }}</span>
+            </div>
+            <div class="font-mono text-sm font-bold text-gray-900 dark:text-white pt-1">{{ stun.host }}</div>
+            <span class="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 pt-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              正常握手 · {{ stun.latency }}ms 延迟
+            </span>
           </div>
-          <div class="p-4 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] space-y-1">
-            <span class="text-xs text-gray-400">腾讯云公共 STUN</span>
-            <div class="font-mono text-sm font-bold text-gray-900 dark:text-white">stun.qq.com:3478</div>
-            <span class="text-xs text-emerald-600">正常握手 · 12ms 延迟</span>
-          </div>
-          <div class="p-4 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] space-y-1">
-            <span class="text-xs text-gray-400">Cloudflare 国际 STUN</span>
-            <div class="font-mono text-sm font-bold text-gray-900 dark:text-white">stun.cloudflare.com:3478</div>
-            <span class="text-xs text-emerald-600">正常握手 · 45ms 延迟</span>
-          </div>
+          <div v-if="stunServers.length === 0" class="col-span-1 md:col-span-3 text-center py-10 text-gray-500 dark:text-gray-400 text-sm">暂无 STUN 服务器，请点击右上角添加。</div>
         </div>
       </main>
 
@@ -2351,43 +2340,35 @@ const runAllTests = () => {
       <main v-else-if="activeSubNav === 'toml'" class="w-full mx-auto pb-20 pt-6 px-4 sm:px-8 lg:px-10 max-w-6xl space-y-4">
         <header class="flex items-center justify-between pb-6 border-b border-gray-200 dark:border-[#2f2e2e]">
           <div>
-            <h1 class="text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">配置编辑 (EasyTier TOML)</h1>
-            <p class="mt-1.5 text-sm text-gray-600 dark:text-gray-400">基于当前网络与节点参数自动生成的官方 easytier-core TOML 配置文件。</p>
+            <h1 class="text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">配置编辑 (TOML)</h1>
+            <p class="mt-1.5 text-sm text-gray-600 dark:text-gray-400">基于当前网络与节点参数自动生成的官方 core TOML 配置文件。</p>
           </div>
-          <button
-            @click="copyText(`[network_identity]\nnetwork_name = '${currentNetwork.name}'\nnetwork_secret = '${currentNetwork.secretKey}'\n\n[vpn_portal]\nipv4 = '${currentNetwork.ipv4Cidr}'\nipv6 = '${currentNetwork.ipv6Cidr}'`, 'TOML 配置')"
-            type="button"
-            class="px-3.5 h-9 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm flex items-center gap-1.5 shadow-2xs"
-          >
-            <Copy class="w-3.5 h-3.5" />
-            <span>复制完整 TOML</span>
-          </button>
+          <div class="flex items-center gap-3">
+            <button
+              @click="saveTomlConfig"
+              type="button"
+              class="px-3.5 h-9 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all cursor-pointer"
+            >
+              <Check class="w-3.5 h-3.5" />
+              <span>保存配置</span>
+            </button>
+            <button
+              @click="copyText(tomlContent, 'TOML 配置')"
+              type="button"
+              class="px-3.5 h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-medium text-sm flex items-center gap-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+            >
+              <Copy class="w-3.5 h-3.5" />
+              <span>复制完整 TOML</span>
+            </button>
+          </div>
         </header>
 
-        <pre class="p-5 rounded-xl bg-gray-900 text-gray-200 font-mono text-xs leading-relaxed border border-gray-800 overflow-x-auto shadow-md">
-# EasyTier Autopilot 网络集中配置文件
-# 所属虚拟网络: {{ currentNetwork.name }}
-
-[network_identity]
-network_name = "{{ currentNetwork.name }}"
-network_secret = "{{ currentNetwork.secretKey }}"
-
-[vpn_portal]
-ipv4 = "{{ currentNetwork.ipv4Cidr }}"
-ipv6 = "{{ currentNetwork.ipv6Cidr }}"
-
-[peer_portal]
-listeners = ["tcp://0.0.0.0:11010", "udp://0.0.0.0:11010", "wg://0.0.0.0:11011"]
-peers = [{{ currentNetwork.relayHubs.map(h => `"tcp://${h}"`).join(', ') }}]
-
-[proxy_network]
-proxy_cidrs = ["192.168.10.0/24", "10.0.0.0/16"]
-
-[flags]
-enable_encryption = true
-enable_stun_turn = true
-enable_exit_node = true
-</pre>
+        <textarea
+          v-model="tomlContent"
+          rows="18"
+          class="w-full p-5 rounded-xl bg-gray-900 text-gray-200 font-mono text-sm leading-relaxed border border-gray-800 shadow-md outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors resize-y"
+          spellcheck="false"
+        ></textarea>
       </main>
 
       <!-- -------------------- 视图 7: 运行日志 -------------------- -->
@@ -2395,20 +2376,23 @@ enable_exit_node = true
         <header class="flex items-center justify-between pb-6 border-b border-gray-200 dark:border-[#2f2e2e]">
           <div>
             <h1 class="text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">运行日志</h1>
-            <p class="mt-1.5 text-sm text-gray-600 dark:text-gray-400">实时捕捉底层 EasyTier 节点的 P2P 穿透、心跳与加密握手事件。</p>
+            <p class="mt-1.5 text-sm text-gray-600 dark:text-gray-400">实时捕捉底层节点的 P2P 穿透、心跳与加密握手事件。</p>
           </div>
-          <button @click="showToast('已清空实时日志视图')" type="button" class="px-3.5 h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs">
+          <button @click="clearLogs" type="button" class="px-3.5 h-9 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs transition-colors cursor-pointer">
             清空视图
           </button>
         </header>
 
         <div class="p-4 rounded-xl bg-gray-900 text-gray-300 font-mono text-xs space-y-2 border border-gray-800 h-96 overflow-y-auto">
-          <div class="text-emerald-400">[INFO] EasyTier Core v2.2.0 initialized on network '{{ currentNetwork.name }}'.</div>
-          <div class="text-blue-400">[STUN] Performing UDP hole punching with stun.easytier.top:3478 -> NAT Type: Full Cone.</div>
-          <div class="text-gray-400">[PEER] Handshake completed with 'hk-gateway-edge' (203.0.113.195) -> Latency: 14ms (Direct WireGuard P2P).</div>
-          <div class="text-gray-400">[ROUTE] Proxy route 192.168.10.0/24 advertised by hk-gateway-edge -> Accepted.</div>
-          <div class="text-amber-400">[RELAY] Direct STUN attempt with 'office-nas-storage' timed out (Symmetric NAT) -> Switched to Relay mode.</div>
-          <div class="text-emerald-400">[PING] Periodic keepalive ok: 4 peers connected, loss rate: 0.00%.</div>
+          <div v-for="log in logsList" :key="log.id" :class="{
+            'text-emerald-400': log.level === 'info',
+            'text-blue-400': log.level === 'stun',
+            'text-gray-400': log.level === 'peer' || log.level === 'route',
+            'text-amber-400': log.level === 'error'
+          }">
+            {{ log.text }}
+          </div>
+          <div v-if="logsList.length === 0" class="text-gray-600 text-center py-10">暂无日志数据</div>
         </div>
       </main>
 
@@ -2437,7 +2421,7 @@ enable_exit_node = true
             <input v-model="currentNetwork.secretKey" type="text" class="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 font-mono" />
           </div>
           <div class="pt-2">
-            <button @click="showToast('已成功保存网络全局设置！')" type="button" class="px-4 py-2 rounded-md bg-blue-600 text-white font-semibold">
+            <button @click="saveSettings" type="button" class="px-4 py-2 rounded-md bg-blue-600 text-white font-semibold">
               保存设置
             </button>
           </div>
@@ -2592,7 +2576,7 @@ enable_exit_node = true
                   <span class="font-semibold text-gray-900 dark:text-white">{{ activeNode?.os }}</span>
                 </div>
                 <div class="p-2.5 rounded border border-gray-200 dark:border-gray-800">
-                  <span class="text-gray-500 block mb-0.5">EasyTier 内核版本</span>
+                  <span class="text-gray-500 block mb-0.5">内核版本</span>
                   <span class="font-mono font-semibold text-gray-900 dark:text-white">{{ activeNode?.easytierVersion }}</span>
                 </div>
               </div>
@@ -2642,7 +2626,7 @@ enable_exit_node = true
 
           <!-- P2P 对端链路 Tab -->
           <div v-else-if="drawerTab === 'peers'" class="space-y-3">
-            <p class="text-gray-500 text-[11px]">通过 EasyTier STUN UDP/TCP 打洞建立的真实点对点直连链路：</p>
+            <p class="text-gray-500 text-[11px]">通过 STUN UDP/TCP 打洞建立的真实点对点直连链路：</p>
             <div
               v-for="p in (activeNode?.peersList || [])"
               :key="p.name"
@@ -2673,7 +2657,7 @@ enable_exit_node = true
               </button>
             </div>
             <pre class="p-3.5 rounded-lg bg-gray-900 text-gray-200 font-mono text-[11px] overflow-x-auto leading-relaxed border border-gray-800">
-# EasyTier 节点自动生成配置文件
+# 节点自动生成配置文件
 [network_identity]
 network_name = "{{ currentNetwork.name }}"
 network_secret = "{{ currentNetwork.secretKey }}"
@@ -2759,7 +2743,7 @@ proxy_cidrs = [{{ (activeNode?.subnets || []).map((s: string) => `"${s}"`).join(
               <span>一键启动加入指令 (Shell)</span>
               <button
                 type="button"
-                @click="copyText(`curl -fsSL https://easytier.top/install.sh | bash && easytier-core --ipv4 10.144.144.${nodes.length + 20} --network-name ${currentNetwork.name} --network-secret ${currentNetwork.secretKey} --peers ${currentNetwork.rpcPortal}`, '启动命令')"
+                @click="copyText(`curl -fsSL https://example.com/install.sh | bash && mesh-core --ipv4 10.144.144.${nodes.length + 20} --network-name ${currentNetwork.name} --network-secret ${currentNetwork.secretKey} --peers ${currentNetwork.rpcPortal}`, '启动命令')"
                 class="text-blue-400 hover:underline flex items-center gap-1 active:scale-[0.95] transition-all cursor-pointer"
               >
                 <Copy class="w-3 h-3" />
@@ -2767,31 +2751,23 @@ proxy_cidrs = [{{ (activeNode?.subnets || []).map((s: string) => `"${s}"`).join(
               </button>
             </div>
             <div class="text-[11px] leading-relaxed break-all select-all text-emerald-400">
-              curl -fsSL https://easytier.top/install.sh | bash && easytier-core --ipv4 10.144.144.{{ nodes.length + 20 }} --network-name {{ currentNetwork.name }} --network-secret {{ currentNetwork.secretKey }} --peers {{ currentNetwork.rpcPortal }}
+              curl -fsSL https://example.com/install.sh | bash && mesh-core --ipv4 10.144.144.{{ nodes.length + 20 }} --network-name {{ currentNetwork.name }} --network-secret {{ currentNetwork.secretKey }} --peers {{ currentNetwork.rpcPortal }}
             </div>
           </div>
 
           <p class="text-gray-500 leading-relaxed text-[11px]">
-            启动后，EasyTier 将自动进行 STUN UDP 探测并建立点对点加密隧道，无需中心服务器转发数据。
+            启动后，核心将自动进行 STUN UDP 探测并建立点对点加密隧道，无需中心服务器转发数据。
           </p>
         </div>
 
-        <div class="p-4 border-t border-gray-200 dark:border-[#2f2e2e] bg-gray-50 dark:bg-[#252424] flex items-center justify-between">
-          <span class="text-gray-500 text-[11px]">支持直接模拟新节点接入</span>
+        <div class="p-4 border-t border-gray-200 dark:border-[#2f2e2e] bg-gray-50 dark:bg-[#252424] flex items-center justify-end">
           <div class="flex items-center gap-2">
             <button
               type="button"
               @click="showAddDeviceModal = false"
-              class="px-3.5 py-1.5 rounded-md border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.98] transition-all cursor-pointer"
-            >
-              取消
-            </button>
-            <button
-              type="button"
-              @click="addNewMockDevice"
               class="px-4 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium active:scale-[0.98] transition-all cursor-pointer"
             >
-              模拟设备接入
+              完成并关闭
             </button>
           </div>
         </div>
@@ -2983,7 +2959,7 @@ proxy_cidrs = [{{ (activeNode?.subnets || []).map((s: string) => `"${s}"`).join(
                 <span v-if="net.relayHubs.length > 0" class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300">
                   {{ net.relayHubs.join(', ') }}
                 </span>
-                <span v-else class="text-[10px] text-gray-400 italic">EasyTier 官方全球中继集群</span>
+                <span v-else class="text-[10px] text-gray-400 italic">官方全球中继集群</span>
               </div>
             </div>
           </div>
@@ -3098,6 +3074,235 @@ proxy_cidrs = [{{ (activeNode?.subnets || []).map((s: string) => `"${s}"`).join(
         <div class="bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-4 py-2.5 rounded-lg shadow-xl text-xs font-medium flex items-center gap-2.5 border border-gray-700 dark:border-gray-200 transition-all">
           <Check class="w-4 h-4 text-emerald-400 dark:text-emerald-600 shrink-0" />
           <span>{{ toastMessage }}</span>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ==================== 策略编辑模态框 (Visual Policy Editor) ==================== -->
+    <div
+      v-if="showPolicyModal"
+      class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+    >
+      <div class="bg-white dark:bg-[#1a1919] w-full max-w-lg rounded-2xl shadow-2xl border border-gray-200 dark:border-[#333232] overflow-hidden flex flex-col">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-[#333232]">
+          <h3 class="text-lg font-bold text-gray-900 dark:text-white">
+            {{ editingPolicy?.id ? '编辑策略规则' : '新建策略规则' }}
+          </h3>
+          <button @click="showPolicyModal = false" class="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-[#2a2929] transition-colors">
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+
+        <div class="p-6 space-y-4 flex-1 overflow-y-auto">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">规则名称</label>
+            <input
+              v-if="editingPolicy"
+              v-model="editingPolicy.name"
+              type="text"
+              class="w-full px-3 py-2 bg-gray-50 dark:bg-[#252424] border border-gray-300 dark:border-[#383737] rounded-lg text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/50 outline-none"
+              placeholder="例如: default-deny-prod"
+            />
+          </div>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">优先级 (越小越高)</label>
+              <input
+                v-if="editingPolicy"
+                v-model.number="editingPolicy.priority"
+                type="number"
+                class="w-full px-3 py-2 bg-gray-50 dark:bg-[#252424] border border-gray-300 dark:border-[#383737] rounded-lg text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/50 outline-none"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">动作 (Action)</label>
+              <select
+                v-if="editingPolicy"
+                v-model="editingPolicy.action"
+                class="w-full px-3 py-2 bg-gray-50 dark:bg-[#252424] border border-gray-300 dark:border-[#383737] rounded-lg text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/50 outline-none"
+              >
+                <option value="allow">放行 (Allow)</option>
+                <option value="deny">阻断 (Deny)</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">匹配源 (Source)</label>
+            <input
+              v-if="editingPolicy"
+              v-model="editingPolicy.src"
+              type="text"
+              class="w-full px-3 py-2 font-mono bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-lg text-sm text-blue-800 dark:text-blue-300 focus:ring-2 focus:ring-blue-500/50 outline-none"
+              placeholder="Tag / IP / CIDR (例如: tag:开发人员 或 10.144.144.0/24)"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">目标 (Destination)</label>
+            <input
+              v-if="editingPolicy"
+              v-model="editingPolicy.dst"
+              type="text"
+              class="w-full px-3 py-2 font-mono bg-emerald-50/50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 rounded-lg text-sm text-emerald-800 dark:text-emerald-300 focus:ring-2 focus:ring-emerald-500/50 outline-none"
+              placeholder="Tag / IP / CIDR:Port (例如: tag:数据库:5432)"
+            />
+          </div>
+        </div>
+
+        <div class="px-6 py-4 border-t border-gray-200 dark:border-[#333232] bg-gray-50 dark:bg-[#1f1e1e] flex justify-end gap-3">
+          <button @click="showPolicyModal = false" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#2a2929] rounded-lg transition-colors">
+            取消
+          </button>
+          <button @click="savePolicy" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm active:scale-95">
+            保存规则
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 添加子网路由模态框 ==================== -->
+    <div
+      v-if="showAddSubnetModal"
+      class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+    >
+      <div class="bg-white dark:bg-[#1a1919] w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 dark:border-[#333232] overflow-hidden flex flex-col">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-[#333232]">
+          <h3 class="text-lg font-bold text-gray-900 dark:text-white">添加子网路由 (Proxy CIDR)</h3>
+          <button @click="showAddSubnetModal = false" class="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-[#2a2929] transition-colors cursor-pointer">
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+
+        <div class="p-6 space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">子网 CIDR</label>
+            <input
+              v-model="newSubnetForm.cidr"
+              type="text"
+              class="w-full px-3 py-2 font-mono bg-gray-50 dark:bg-[#252424] border border-gray-300 dark:border-[#383737] rounded-lg text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/50 outline-none"
+              placeholder="例如: 192.168.1.0/24"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">宣告网关节点</label>
+            <select
+              v-model="newSubnetForm.nodeId"
+              class="w-full px-3 py-2 bg-gray-50 dark:bg-[#252424] border border-gray-300 dark:border-[#383737] rounded-lg text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/50 outline-none"
+            >
+              <option value="" disabled>请选择一个在线节点...</option>
+              <option v-for="n in nodes" :key="n.id" :value="n.id">
+                {{ n.hostname }} ({{ n.ipv4 || n.publicIp }})
+              </option>
+            </select>
+          </div>
+        </div>
+
+        <div class="px-6 py-4 border-t border-gray-200 dark:border-[#333232] bg-gray-50 dark:bg-[#1f1e1e] flex justify-end gap-3">
+          <button @click="showAddSubnetModal = false" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#2a2929] rounded-lg transition-colors cursor-pointer">
+            取消
+          </button>
+          <button @click="addSubnetRoute" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm active:scale-95 cursor-pointer">
+            确认添加
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 添加测试用例模态框 ==================== -->
+    <div
+      v-if="showAddTestModal"
+      class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+    >
+      <div class="bg-white dark:bg-[#1a1919] w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 dark:border-[#333232] overflow-hidden flex flex-col">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-[#333232]">
+          <h3 class="text-lg font-bold text-gray-900 dark:text-white">添加 ACL 测试断言</h3>
+          <button @click="showAddTestModal = false" class="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-[#2a2929] transition-colors cursor-pointer">
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+
+        <div class="p-6 space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">测试描述</label>
+            <input
+              v-model="newTestForm.name"
+              type="text"
+              class="w-full px-3 py-2 bg-gray-50 dark:bg-[#252424] border border-gray-300 dark:border-[#383737] rounded-lg text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/50 outline-none"
+              placeholder="例如: 阻断访客访问生产库"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">模拟源 (Source)</label>
+            <input
+              v-model="newTestForm.src"
+              type="text"
+              class="w-full px-3 py-2 font-mono bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-lg text-sm text-blue-800 dark:text-blue-300 focus:ring-2 focus:ring-blue-500/50 outline-none"
+              placeholder="Tag 或 IP"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">模拟目标 (Destination)</label>
+            <input
+              v-model="newTestForm.dst"
+              type="text"
+              class="w-full px-3 py-2 font-mono bg-emerald-50/50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 rounded-lg text-sm text-emerald-800 dark:text-emerald-300 focus:ring-2 focus:ring-emerald-500/50 outline-none"
+              placeholder="Tag 或 IP:Port"
+            />
+          </div>
+        </div>
+
+        <div class="px-6 py-4 border-t border-gray-200 dark:border-[#333232] bg-gray-50 dark:bg-[#1f1e1e] flex justify-end gap-3">
+          <button @click="showAddTestModal = false" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#2a2929] rounded-lg transition-colors cursor-pointer">
+            取消
+          </button>
+          <button @click="addTestCase" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm active:scale-95 cursor-pointer">
+            确认添加
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 添加 STUN 服务器/中继弹窗 -->
+    <div
+      v-if="showAddStunModal"
+      class="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/60 dark:bg-black/70 backdrop-blur-sm transition-all"
+    >
+      <div class="w-full max-w-md bg-white dark:bg-[#252424] rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div class="px-6 py-4 flex items-center justify-between border-b border-gray-200 dark:border-[#333232]">
+          <h3 class="text-lg font-bold text-gray-900 dark:text-white">添加 STUN 节点</h3>
+          <button @click="showAddStunModal = false" class="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-[#2a2929] transition-colors cursor-pointer">
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+
+        <div class="p-6 space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">节点名称</label>
+            <input v-model="newStunForm.name" type="text" placeholder="例如：官方 STUN 节点 1" class="w-full px-3 py-2 bg-gray-50 dark:bg-[#1a1919] border border-gray-300 dark:border-[#333232] rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 dark:text-white text-sm" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">节点地址 (Host:Port)</label>
+            <input v-model="newStunForm.host" type="text" placeholder="例如：stun.easytier.cn:3478" class="w-full px-3 py-2 bg-gray-50 dark:bg-[#1a1919] border border-gray-300 dark:border-[#333232] rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-gray-900 dark:text-white text-sm" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">节点类型</label>
+            <select v-model="newStunForm.type" class="w-full px-3 py-2 bg-gray-50 dark:bg-[#1a1919] border border-gray-300 dark:border-[#333232] rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 dark:text-white text-sm">
+              <option value="public">公共 STUN 服务器</option>
+              <option value="private">私有中继节点</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="px-6 py-4 border-t border-gray-200 dark:border-[#333232] bg-gray-50 dark:bg-[#1f1e1e] flex justify-end gap-3">
+          <button @click="showAddStunModal = false" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#2a2929] rounded-lg transition-colors cursor-pointer">
+            取消
+          </button>
+          <button @click="addStunServer" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm active:scale-95 cursor-pointer">
+            确认添加
+          </button>
         </div>
       </div>
     </div>
