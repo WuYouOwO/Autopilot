@@ -3,7 +3,6 @@ import { ref, computed } from 'vue'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import {
   Network,
-  Users,
   Lock,
   Book,
   Settings,
@@ -24,22 +23,26 @@ import {
   ShieldCheck,
   CheckCircle2,
   Menu,
+  Radio,
+  Server,
+  Activity,
+  Zap,
 } from 'lucide-vue-next'
 
-// --- 导航状态定义 (Tailscale 侧边栏树形按钮规范) ---
-type SubNavItem = 'machines' | 'apps' | 'services' | 'dns' | 'users' | 'policies' | 'tests' | 'definitions' | 'json-editor' | 'logs' | 'settings'
+// --- 导航菜单状态定义 (保留 Tailscale 原生树形连线与指示条，完全适配 EasyTier 功能架构) ---
+type SubNavItem = 'machines' | 'subnets' | 'stun' | 'policies' | 'tests' | 'toml' | 'logs' | 'settings' | 'docs' | 'diagnostics'
 const activeSubNav = ref<SubNavItem>('machines')
 
-// 移动端菜单抽屉
+// 移动端菜单抽屉状态
 const mobileMenuOpen = ref(false)
 
-// 折叠组状态 (默认全展开，便于查看)
+// 折叠组状态
 const isNetworkOpen = ref(true)
 const isAccessControlsOpen = ref(true)
 const isLogsOpen = ref(false)
 const isSettingsOpen = ref(false)
 
-// Toast 通知
+// 全局 Toast 提示
 const toastMessage = ref<string | null>(null)
 const copiedKey = ref<string | null>(null)
 
@@ -59,61 +62,61 @@ const copyText = (text: string, label: string) => {
   }, 1800)
 }
 
-// --- ACL Tests 模块状态 ---
+// --- ACL Tests 规则验证数据 ---
 const aclTests = ref([
   {
     id: 'test-1',
-    name: 'Developers access to Staging Database',
-    src: 'group:developers',
-    dst: 'tag:staging-db:5432',
-    action: 'accept',
-    status: 'pass',
+    name: '开发机访问预发布数据库集群',
+    src: 'tag:开发人员',
+    dst: 'tag:测试数据库:5432',
+    action: '放行',
+    status: '通过',
     latency: '1.2ms',
-    ruleMatched: 'Rule #3: allow-dev-to-staging',
+    ruleMatched: '规则 #3: allow-dev-to-staging',
   },
   {
     id: 'test-2',
-    name: 'Developers blocked from Production Database',
-    src: 'group:developers',
-    dst: 'tag:prod-db:5432',
-    action: 'deny',
-    status: 'pass',
+    name: '阻断普通开发节点直连生产核心库',
+    src: 'tag:开发人员',
+    dst: 'tag:核心数据库:5432',
+    action: '阻断',
+    status: '通过',
     latency: '0.8ms',
-    ruleMatched: 'Rule #1: default-deny-prod',
+    ruleMatched: '规则 #1: default-deny-prod',
   },
   {
     id: 'test-3',
-    name: 'CI/CD runner deploy to Kubernetes Cluster',
-    src: 'tag:github-runner',
-    dst: 'tag:k8s-control-plane:6443',
-    action: 'accept',
-    status: 'pass',
+    name: 'CI/CD 自动化节点部署至 Kubernetes 控制面',
+    src: 'tag:构建节点',
+    dst: 'tag:k8s集群控制面:6443',
+    action: '放行',
+    status: '通过',
     latency: '2.1ms',
-    ruleMatched: 'Rule #7: cicd-k8s-apiserver',
+    ruleMatched: '规则 #7: cicd-k8s-apiserver',
   },
   {
     id: 'test-4',
-    name: 'Office Guest WiFi denied from NAS Storage',
-    src: 'tag:guest-wifi',
-    dst: 'tag:storage-nas:*',
-    action: 'deny',
-    status: 'pass',
+    name: '隔离访客办公 WiFi 访问内网 NAS 存储',
+    src: 'tag:访客网络',
+    dst: 'tag:局域网存储:*',
+    action: '阻断',
+    status: '通过',
     latency: '0.4ms',
-    ruleMatched: 'Rule #2: isolate-guests',
+    ruleMatched: '规则 #2: isolate-guests',
   },
 ])
 
 const isRunningTests = ref(false)
 const runAllTests = () => {
   isRunningTests.value = true
-  showToast('正在运行全部 ACL 访问控制测试用例...')
+  showToast('正在执行 EasyTier 数据包过滤规则断言测试...')
   setTimeout(() => {
     isRunningTests.value = false
-    showToast('所有 ACL 规则验证通过：4 通过，0 失败')
-  }, 800)
+    showToast('全部 ACL 安全策略校验通过：4 项通过，0 项失败')
+  }, 750)
 }
 
-// --- Machines 列表状态 ---
+// --- 设备节点数据与状态 ---
 const isBannerMinimized = ref(false)
 const showAddDeviceModal = ref(false)
 const selectedOs = ref<'linux' | 'macos' | 'windows' | 'docker'>('linux')
@@ -125,95 +128,99 @@ const drawerOpen = ref(false)
 const drawerTab = ref<'details' | 'routing' | 'peers' | 'toml'>('details')
 const activeNode = ref<any | null>(null)
 
-// 节点数据
+// 节点数据 (已清除所有个人信息，统一使用标准技术中立标识)
 const nodes = ref([
   {
-    id: 'node-hk-gw',
+    id: 'node-edge-gw',
     hostname: 'hk-gateway-edge',
-    domain: 'hk-gateway-edge.seelcmo.org',
+    domain: 'hk-gateway-edge.easytier.local',
     os: 'Ubuntu 24.04 LTS (x86_64)',
     osType: 'linux',
     ipv4: '10.144.144.1',
     ipv6: 'fd00:144:144::1',
     status: 'online',
-    connection: 'Direct',
+    connection: '直连 P2P',
+    natType: 'Full Cone NAT (全锥形)',
     latencyMs: 14,
-    lastSeen: 'Connected',
+    lastSeen: '实时在线',
     subnets: ['192.168.10.0/24'],
     isSubnetApproved: true,
     isExitNode: true,
-    tags: ['tag:gateway', 'tag:prod'],
-    keyExpiry: 'Never',
-    easytierVersion: 'v2.2.0-rc1',
+    tags: ['tag:网关', 'tag:生产'],
+    keyExpiry: '永久有效',
+    easytierVersion: 'v2.2.0',
     listeners: ['tcp://0.0.0.0:11010', 'udp://0.0.0.0:11010', 'wg://0.0.0.0:11011'],
     peersList: [
-      { name: 'mbp-m3-dev', ip: '10.144.144.2', mode: 'Direct (STUN Cone)', latency: '24ms', rx: '14.2 MB', tx: '88.5 MB' },
-      { name: 'shanghai-nas', ip: '10.144.144.10', mode: 'Relay (HK-Hub)', latency: '78ms', rx: '1.2 GB', tx: '450 MB' },
+      { name: 'mbp-m3-workstation', ip: '10.144.144.2', mode: '直连 (STUN UDP 打洞)', latency: '24ms', rx: '14.2 MB', tx: '88.5 MB' },
+      { name: 'office-nas-storage', ip: '10.144.144.10', mode: '中继 (经由香港中继节点)', latency: '78ms', rx: '1.2 GB', tx: '450 MB' },
     ],
   },
   {
-    id: 'node-mac-m3',
-    hostname: 'mbp-m3-dev',
-    domain: 'mbp-m3-dev.seelcmo.org',
+    id: 'node-workstation-mac',
+    hostname: 'mbp-m3-workstation',
+    domain: 'mbp-m3-workstation.easytier.local',
     os: 'macOS Sequoia 15.1 (Apple Silicon)',
     osType: 'macos',
     ipv4: '10.144.144.2',
     ipv6: 'fd00:144:144::2',
     status: 'online',
-    connection: 'Direct',
+    connection: '直连 P2P',
+    natType: 'Restricted Cone NAT (受限锥形)',
     latencyMs: 24,
-    lastSeen: 'Connected',
+    lastSeen: '实时在线',
     subnets: [],
     isSubnetApproved: false,
     isExitNode: false,
-    tags: ['tag:developer', 'tag:laptop'],
-    keyExpiry: 'In 88 days',
-    easytierVersion: 'v2.2.0-rc1',
+    tags: ['tag:开发机', 'tag:移动办公'],
+    keyExpiry: '88 天后到期',
+    easytierVersion: 'v2.2.0',
     listeners: ['tcp://0.0.0.0:11010', 'udp://0.0.0.0:11010'],
     peersList: [
-      { name: 'hk-gateway-edge', ip: '10.144.144.1', mode: 'Direct (STUN Cone)', latency: '24ms', rx: '88.5 MB', tx: '14.2 MB' },
+      { name: 'hk-gateway-edge', ip: '10.144.144.1', mode: '直连 (STUN UDP 打洞)', latency: '24ms', rx: '88.5 MB', tx: '14.2 MB' },
     ],
   },
   {
-    id: 'node-sh-nas',
-    hostname: 'shanghai-storage-nas',
-    domain: 'shanghai-nas.seelcmo.org',
+    id: 'node-nas-storage',
+    hostname: 'office-nas-storage',
+    domain: 'office-nas-storage.easytier.local',
     os: 'Debian GNU/Linux 12 (bookworm)',
     osType: 'linux',
     ipv4: '10.144.144.10',
     ipv6: 'fd00:144:144::10',
     status: 'online',
-    connection: 'Relay',
+    connection: '中继转发',
+    natType: 'Symmetric NAT (对称型)',
     latencyMs: 78,
-    lastSeen: 'Connected',
+    lastSeen: '实时在线',
     subnets: ['10.0.0.0/16'],
     isSubnetApproved: true,
     isExitNode: false,
-    tags: ['tag:storage', 'tag:backup'],
-    keyExpiry: 'Never',
+    tags: ['tag:存储', 'tag:备份'],
+    keyExpiry: '永久有效',
     easytierVersion: 'v2.1.8',
     listeners: ['tcp://0.0.0.0:11010'],
     peersList: [
-      { name: 'hk-gateway-edge', ip: '10.144.144.1', mode: 'Relay (HK-Hub)', latency: '78ms', rx: '450 MB', tx: '1.2 GB' },
+      { name: 'hk-gateway-edge', ip: '10.144.144.1', mode: '中继 (节点协同转发)', latency: '78ms', rx: '450 MB', tx: '1.2 GB' },
     ],
   },
   {
     id: 'node-win-pc',
     hostname: 'win11-workstation',
-    domain: 'win11-workstation.seelcmo.org',
+    domain: 'win11-workstation.easytier.local',
     os: 'Windows 11 Pro 24H2',
     osType: 'windows',
     ipv4: '10.144.144.15',
     ipv6: 'fd00:144:144::15',
     status: 'offline',
-    connection: 'Disconnected',
+    connection: '已断开',
+    natType: '未知',
     latencyMs: 0,
-    lastSeen: '2 hours ago',
+    lastSeen: '2 小时前',
     subnets: [],
     isSubnetApproved: false,
     isExitNode: false,
-    tags: ['tag:office'],
-    keyExpiry: 'Expired',
+    tags: ['tag:办公桌面'],
+    keyExpiry: '已过期',
     easytierVersion: 'v2.1.7',
     listeners: ['udp://0.0.0.0:11010'],
     peersList: [],
@@ -252,36 +259,37 @@ const saveDrawerChanges = () => {
     nodes.value[idx] = JSON.parse(JSON.stringify(activeNode.value))
   }
   drawerOpen.value = false
-  showToast(`已成功保存节点 ${activeNode.value.hostname} 的网络配置`)
+  showToast(`已成功保存节点 ${activeNode.value.hostname} 的网络与子网配置`)
 }
 
-// 快速添加模拟节点
+// 模拟添加新节点
 const addNewMockDevice = () => {
   const newId = `node-${Date.now().toString().slice(-4)}`
   const newNode = {
     id: newId,
-    hostname: `new-device-${nodes.value.length + 1}`,
-    domain: `new-device-${nodes.value.length + 1}.seelcmo.org`,
-    os: 'Linux (Arch rolling)',
+    hostname: `node-agent-${nodes.value.length + 1}`,
+    domain: `node-agent-${nodes.value.length + 1}.easytier.local`,
+    os: 'Linux (x86_64)',
     osType: 'linux',
     ipv4: `10.144.144.${nodes.value.length + 20}`,
     ipv6: `fd00:144:144::${nodes.value.length + 20}`,
     status: 'online',
-    connection: 'Direct',
+    connection: '直连 P2P',
+    natType: 'Full Cone NAT',
     latencyMs: 18,
-    lastSeen: 'Connected',
+    lastSeen: '实时在线',
     subnets: [],
     isSubnetApproved: false,
     isExitNode: false,
-    tags: ['tag:new'],
-    keyExpiry: 'Never',
-    easytierVersion: 'v2.2.0-rc1',
+    tags: ['tag:新节点'],
+    keyExpiry: '永久有效',
+    easytierVersion: 'v2.2.0',
     listeners: ['tcp://0.0.0.0:11010'],
     peersList: [],
   }
   nodes.value.unshift(newNode)
   showAddDeviceModal.value = false
-  showToast(`设备 ${newNode.hostname} 已成功接入 EasyTier Tailnet！`)
+  showToast(`设备 ${newNode.hostname} 已成功加入 EasyTier 虚拟网络！`)
 }
 </script>
 
@@ -295,26 +303,26 @@ const addNewMockDevice = () => {
           type="button"
           @click="mobileMenuOpen = !mobileMenuOpen"
           class="p-1.5 rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800"
-          aria-label="Open menu"
+          aria-label="打开侧边菜单"
         >
           <Menu class="w-5 h-5" />
         </button>
-        <span class="font-semibold text-sm">seelcmo.org</span>
+        <span class="font-semibold text-sm">EasyTier 控制台</span>
       </div>
       <ThemeToggle />
     </header>
 
-    <!-- ==================== 左侧固定导航栏 (Tailscale 1:1 结构) ==================== -->
+    <!-- ==================== 左侧固定导航栏 (Tailscale 原生结构 · 移除冗余无用功能) ==================== -->
     <aside
       :class="[
         'fixed top-0 bottom-0 left-0 w-60 border-r border-gray-200 dark:border-[#2f2e2e] bg-[#f9fafb] dark:bg-[#1f1e1e] z-50 select-none flex flex-col transition-transform duration-200 lg:translate-x-0',
         mobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
       ]"
     >
-      <!-- 组织网络标题栏 (::: seelcmo.org  [Free]) -->
+      <!-- 组织网络标题栏 (中立化 · 移除个人信息) -->
       <div class="h-14 px-3 border-b border-gray-200 dark:border-[#2f2e2e] flex items-center justify-between">
         <a href="javascript:void(0)" class="flex items-center min-w-0 gap-2.5 hover:opacity-80 transition-opacity">
-          <!-- Tailscale 3x3 九宫格 Dot Matrix 图标 -->
+          <!-- 3x3 九宫格 Dot Matrix 图标 -->
           <svg width="18" height="18" viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg" class="shrink-0 text-gray-900 dark:text-white" aria-hidden="true">
             <circle opacity="0.25" cx="3.4" cy="3.25" r="2.7" fill="currentColor"></circle>
             <circle cx="3.4" cy="11.3" r="2.7" fill="currentColor"></circle>
@@ -326,11 +334,11 @@ const addNewMockDevice = () => {
             <circle cx="19.5" cy="11.3" r="2.7" fill="currentColor"></circle>
             <circle opacity="0.25" cx="19.5" cy="19.5" r="2.7" fill="currentColor"></circle>
           </svg>
-          <span class="font-semibold text-sm truncate text-gray-900 dark:text-gray-100">seelcmo.org</span>
+          <span class="font-semibold text-sm truncate text-gray-900 dark:text-gray-100">default-mesh</span>
         </a>
         <div class="flex items-center gap-1.5">
-          <span class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium border border-gray-200 dark:border-transparent bg-gray-200/80 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded">
-            Free
+          <span class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 rounded">
+            正常运行
           </span>
           <button
             type="button"
@@ -342,10 +350,10 @@ const addNewMockDevice = () => {
         </div>
       </div>
 
-      <!-- 导航列表项 (层级树引导线 + 选中指示暗条) -->
+      <!-- 导航列表项 (精确保留树形连线与深色圆角药丸立柱指示条) -->
       <div class="flex-1 overflow-y-auto px-2 py-3 space-y-0.5 text-sm">
         
-        <!-- 1. Network 分组 -->
+        <!-- 1. 网络与节点分组 (已完全移除无意义的 Apps / Services) -->
         <div>
           <button
             type="button"
@@ -354,17 +362,17 @@ const addNewMockDevice = () => {
           >
             <div class="flex items-center gap-2.5">
               <Network class="w-4 h-4 text-gray-700 dark:text-gray-300" />
-              <span>Network</span>
+              <span>网络与节点</span>
             </div>
             <ChevronDown v-if="isNetworkOpen" class="w-3.5 h-3.5 text-gray-400" />
             <ChevronRight v-else class="w-3.5 h-3.5 text-gray-400" />
           </button>
 
-          <!-- Network 子级菜单 (树形引导线 + 按钮项) -->
+          <!-- 网络与节点子项 (树形引导线 + 药丸立柱指示条) -->
           <div v-show="isNetworkOpen" class="relative pl-6 py-0.5 space-y-0.5">
             <div class="absolute left-[21px] top-1 bottom-1 w-[1px] bg-gray-200 dark:bg-[#333232]"></div>
 
-            <!-- Machines -->
+            <!-- 设备节点 -->
             <button
               type="button"
               @click="activeSubNav = 'machines'; mobileMenuOpen = false"
@@ -379,81 +387,48 @@ const addNewMockDevice = () => {
                 v-if="activeSubNav === 'machines'"
                 class="absolute left-[20px] top-1/2 -translate-y-1/2 w-[3px] h-[16px] rounded-full bg-gray-700 dark:bg-gray-200"
               ></span>
-              <span>Machines</span>
+              <span>设备节点</span>
             </button>
 
-            <!-- Apps -->
+            <!-- 子网路由 -->
             <button
               type="button"
-              @click="activeSubNav = 'apps'; showToast('切换至 Apps 应用连接网关'); mobileMenuOpen = false"
+              @click="activeSubNav = 'subnets'; showToast('子网路由与局域网代理网段'); mobileMenuOpen = false"
               :class="[
                 'relative flex items-center w-full pl-6 pr-2.5 py-1.5 rounded-md text-sm transition-all duration-100 text-left active:scale-[0.98] cursor-pointer',
-                activeSubNav === 'apps'
+                activeSubNav === 'subnets'
                   ? 'bg-[#ebebeb] dark:bg-[#2e2d2d] text-gray-900 dark:text-white font-medium'
                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#282727] hover:text-gray-900 dark:hover:text-white'
               ]"
             >
               <span
-                v-if="activeSubNav === 'apps'"
+                v-if="activeSubNav === 'subnets'"
                 class="absolute left-[20px] top-1/2 -translate-y-1/2 w-[3px] h-[16px] rounded-full bg-gray-700 dark:bg-gray-200"
               ></span>
-              <span>Apps</span>
+              <span>子网路由 (Proxy CIDR)</span>
             </button>
 
-            <!-- Services -->
+            <!-- 公共中继与 STUN -->
             <button
               type="button"
-              @click="activeSubNav = 'services'; showToast('切换至 Services 网络服务列表'); mobileMenuOpen = false"
+              @click="activeSubNav = 'stun'; showToast('STUN 探测服务器与中继节点状态'); mobileMenuOpen = false"
               :class="[
                 'relative flex items-center w-full pl-6 pr-2.5 py-1.5 rounded-md text-sm transition-all duration-100 text-left active:scale-[0.98] cursor-pointer',
-                activeSubNav === 'services'
+                activeSubNav === 'stun'
                   ? 'bg-[#ebebeb] dark:bg-[#2e2d2d] text-gray-900 dark:text-white font-medium'
                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#282727] hover:text-gray-900 dark:hover:text-white'
               ]"
             >
               <span
-                v-if="activeSubNav === 'services'"
+                v-if="activeSubNav === 'stun'"
                 class="absolute left-[20px] top-1/2 -translate-y-1/2 w-[3px] h-[16px] rounded-full bg-gray-700 dark:bg-gray-200"
               ></span>
-              <span>Services</span>
-            </button>
-
-            <!-- DNS -->
-            <button
-              type="button"
-              @click="activeSubNav = 'dns'; showToast('切换至 MagicDNS 域名配置'); mobileMenuOpen = false"
-              :class="[
-                'relative flex items-center w-full pl-6 pr-2.5 py-1.5 rounded-md text-sm transition-all duration-100 text-left active:scale-[0.98] cursor-pointer',
-                activeSubNav === 'dns'
-                  ? 'bg-[#ebebeb] dark:bg-[#2e2d2d] text-gray-900 dark:text-white font-medium'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#282727] hover:text-gray-900 dark:hover:text-white'
-              ]"
-            >
-              <span
-                v-if="activeSubNav === 'dns'"
-                class="absolute left-[20px] top-1/2 -translate-y-1/2 w-[3px] h-[16px] rounded-full bg-gray-700 dark:bg-gray-200"
-              ></span>
-              <span>DNS</span>
+              <span>STUN 穿透与中继</span>
             </button>
           </div>
         </div>
 
-        <!-- 2. Users -->
-        <button
-          type="button"
-          @click="activeSubNav = 'users'; showToast('切换至 Users 用户管理'); mobileMenuOpen = false"
-          :class="[
-            'flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-md font-normal transition-all duration-100 active:scale-[0.98] cursor-pointer text-left',
-            activeSubNav === 'users'
-              ? 'bg-[#ebebeb] dark:bg-[#2e2d2d] text-gray-900 dark:text-white font-medium'
-              : 'text-gray-800 dark:text-gray-200 hover:bg-gray-200/60 dark:hover:bg-gray-800'
-          ]"
-        >
-          <Users class="w-4 h-4 text-gray-700 dark:text-gray-300" />
-          <span>Users</span>
-        </button>
-
-        <!-- 3. Access controls 分组 -->
+        <!-- 2. 访问控制与策略分组 (EasyTier 数据包防火墙与规则) -->
         <div>
           <button
             type="button"
@@ -462,20 +437,20 @@ const addNewMockDevice = () => {
           >
             <div class="flex items-center gap-2.5">
               <Lock class="w-4 h-4 text-gray-700 dark:text-gray-300" />
-              <span>Access controls</span>
+              <span>访问控制 (ACL)</span>
             </div>
             <ChevronDown v-if="isAccessControlsOpen" class="w-3.5 h-3.5 text-gray-400" />
             <ChevronRight v-else class="w-3.5 h-3.5 text-gray-400" />
           </button>
 
-          <!-- Access controls 子级菜单 -->
+          <!-- 访问控制子项 -->
           <div v-show="isAccessControlsOpen" class="relative pl-6 py-0.5 space-y-0.5">
             <div class="absolute left-[21px] top-1 bottom-1 w-[1px] bg-gray-200 dark:bg-[#333232]"></div>
 
-            <!-- Policies -->
+            <!-- 策略规则 -->
             <button
               type="button"
-              @click="activeSubNav = 'policies'; showToast('切换至 ACL Policies 策略规则'); mobileMenuOpen = false"
+              @click="activeSubNav = 'policies'; showToast('切换至 ACL 访问控制策略列表'); mobileMenuOpen = false"
               :class="[
                 'relative flex items-center w-full pl-6 pr-2.5 py-1.5 rounded-md text-sm transition-all duration-100 text-left active:scale-[0.98] cursor-pointer',
                 activeSubNav === 'policies'
@@ -487,10 +462,10 @@ const addNewMockDevice = () => {
                 v-if="activeSubNav === 'policies'"
                 class="absolute left-[20px] top-1/2 -translate-y-1/2 w-[3px] h-[16px] rounded-full bg-gray-700 dark:bg-gray-200"
               ></span>
-              <span>Policies</span>
+              <span>策略规则</span>
             </button>
 
-            <!-- Tests -->
+            <!-- 规则测试 -->
             <button
               type="button"
               @click="activeSubNav = 'tests'; mobileMenuOpen = false"
@@ -505,107 +480,89 @@ const addNewMockDevice = () => {
                 v-if="activeSubNav === 'tests'"
                 class="absolute left-[20px] top-1/2 -translate-y-1/2 w-[3px] h-[16px] rounded-full bg-gray-700 dark:bg-gray-200"
               ></span>
-              <span>Tests</span>
+              <span>规则测试</span>
             </button>
 
-            <!-- Definitions -->
+            <!-- TOML 配置生成 -->
             <button
               type="button"
-              @click="activeSubNav = 'definitions'; showToast('切换至 Definitions 别名与标签定义'); mobileMenuOpen = false"
+              @click="activeSubNav = 'toml'; showToast('查看 EasyTier 完整 TOML 配置文件'); mobileMenuOpen = false"
               :class="[
                 'relative flex items-center w-full pl-6 pr-2.5 py-1.5 rounded-md text-sm transition-all duration-100 text-left active:scale-[0.98] cursor-pointer',
-                activeSubNav === 'definitions'
+                activeSubNav === 'toml'
                   ? 'bg-[#ebebeb] dark:bg-[#2e2d2d] text-gray-900 dark:text-white font-medium'
                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#282727] hover:text-gray-900 dark:hover:text-white'
               ]"
             >
               <span
-                v-if="activeSubNav === 'definitions'"
+                v-if="activeSubNav === 'toml'"
                 class="absolute left-[20px] top-1/2 -translate-y-1/2 w-[3px] h-[16px] rounded-full bg-gray-700 dark:bg-gray-200"
               ></span>
-              <span>Definitions</span>
-            </button>
-
-            <!-- JSON editor -->
-            <button
-              type="button"
-              @click="activeSubNav = 'json-editor'; showToast('切换至 JSON 策略代码编辑器'); mobileMenuOpen = false"
-              :class="[
-                'relative flex items-center w-full pl-6 pr-2.5 py-1.5 rounded-md text-sm transition-all duration-100 text-left active:scale-[0.98] cursor-pointer',
-                activeSubNav === 'json-editor'
-                  ? 'bg-[#ebebeb] dark:bg-[#2e2d2d] text-gray-900 dark:text-white font-medium'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#282727] hover:text-gray-900 dark:hover:text-white'
-              ]"
-            >
-              <span
-                v-if="activeSubNav === 'json-editor'"
-                class="absolute left-[20px] top-1/2 -translate-y-1/2 w-[3px] h-[16px] rounded-full bg-gray-700 dark:bg-gray-200"
-              ></span>
-              <span>JSON editor</span>
+              <span>配置编辑 (TOML)</span>
             </button>
           </div>
         </div>
 
-        <!-- 4. Logs -->
+        <!-- 3. 运行日志 -->
         <button
           type="button"
-          @click="isLogsOpen = !isLogsOpen; showToast('展开/收起 Logs 审计流转')"
+          @click="isLogsOpen = !isLogsOpen; showToast('查看底层节点握手与运行日志')"
           class="flex items-center justify-between w-full px-2.5 py-1.5 rounded-md font-normal text-gray-800 dark:text-gray-200 hover:bg-gray-200/60 dark:hover:bg-gray-800 active:scale-[0.98] transition-all duration-100 cursor-pointer"
         >
           <div class="flex items-center gap-2.5">
             <Book class="w-4 h-4 text-gray-700 dark:text-gray-300" />
-            <span>Logs</span>
+            <span>运行日志</span>
           </div>
           <ChevronRight class="w-3.5 h-3.5 text-gray-400" />
         </button>
 
-        <!-- 5. Settings -->
+        <!-- 4. 网络设置 -->
         <button
           type="button"
-          @click="isSettingsOpen = !isSettingsOpen; showToast('展开/收起 Settings 网络配置')"
+          @click="isSettingsOpen = !isSettingsOpen; showToast('网络密钥与虚拟网段参数设置')"
           class="flex items-center justify-between w-full px-2.5 py-1.5 rounded-md font-normal text-gray-800 dark:text-gray-200 hover:bg-gray-200/60 dark:hover:bg-gray-800 active:scale-[0.98] transition-all duration-100 cursor-pointer"
         >
           <div class="flex items-center gap-2.5">
             <Settings class="w-4 h-4 text-gray-700 dark:text-gray-300" />
-            <span>Settings</span>
+            <span>网络设置</span>
           </div>
           <ChevronRight class="w-3.5 h-3.5 text-gray-400" />
         </button>
 
-        <!-- 底部 Resource Hub & Help -->
+        <!-- 底部帮助与诊断 -->
         <div class="pt-4 mt-4 border-t border-gray-200 dark:border-[#2f2e2e] space-y-0.5">
           <a
             href="javascript:void(0)"
-            @click="showToast('打开 EasyTier 官方知识库')"
+            @click="showToast('打开 EasyTier 官方技术文档')"
             class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-xs font-normal text-gray-600 dark:text-gray-400 hover:bg-gray-200/60 dark:hover:bg-gray-800 active:scale-[0.98] transition-all"
           >
             <BookOpen class="w-4 h-4 text-gray-400" />
-            <span>Resource hub</span>
+            <span>使用文档</span>
           </a>
           <a
             href="javascript:void(0)"
-            @click="showToast('帮助与支持')"
+            @click="showToast('节点连通性排查与延迟探测')"
             class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-xs font-normal text-gray-600 dark:text-gray-400 hover:bg-gray-200/60 dark:hover:bg-gray-800 active:scale-[0.98] transition-all"
           >
             <CircleHelp class="w-4 h-4 text-gray-400" />
-            <span>Help</span>
+            <span>故障诊断</span>
           </a>
         </div>
       </div>
 
-      <!-- 用户账号条 (Wu You) -->
+      <!-- 用户账号条 (中立化 · 移除个人姓名与私有邮箱) -->
       <div class="p-2 border-t border-gray-200 dark:border-[#2f2e2e]">
         <button
           type="button"
-          @click="showToast('当前登录用户: Wu You (seelcmo.org 管理员)')"
+          @click="showToast('当前登录身份：网络管理员 (Administrator)')"
           class="flex items-center gap-2.5 w-full px-2 py-1.5 rounded-md text-left hover:bg-gray-200/60 dark:hover:bg-gray-800 active:scale-[0.98] transition-all"
         >
-          <div class="w-7 h-7 rounded-full flex items-center justify-center font-semibold text-white text-xs select-none shrink-0" style="background-color: rgb(196, 76, 52);">
-            W
+          <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-white text-xs select-none shrink-0 bg-blue-600 dark:bg-blue-500">
+            管
           </div>
           <div class="flex flex-col min-w-0 flex-1 leading-tight">
-            <span class="truncate text-xs font-semibold text-gray-900 dark:text-white">Wu You</span>
-            <span class="truncate text-[11px] text-gray-500 dark:text-gray-400">WuYou@SeeLcmo.org</span>
+            <span class="truncate text-xs font-semibold text-gray-900 dark:text-white">网络管理员</span>
+            <span class="truncate text-[11px] text-gray-500 dark:text-gray-400 font-mono">admin@easytier.local</span>
           </div>
         </button>
       </div>
@@ -621,20 +578,20 @@ const addNewMockDevice = () => {
     <!-- ==================== 右侧主内容区域 ==================== -->
     <div class="flex-1 min-w-0 lg:pl-60 pt-14 lg:pt-0">
       
-      <!-- -------------------- 视图 A: 当 activeSubNav === 'tests' 时呈现 (ACL 规则测试) -------------------- -->
+      <!-- -------------------- 视图 A: 当 activeSubNav === 'tests' 时呈现 (ACL 规则测试面板) -------------------- -->
       <main v-if="activeSubNav === 'tests'" class="w-full mx-auto pb-20 pt-6 px-4 sm:px-8 lg:px-10 max-w-6xl">
         <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-gray-200 dark:border-[#2f2e2e]">
           <div>
             <div class="flex items-center gap-3">
               <h1 class="text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">
-                ACL Tests
+                ACL 规则测试
               </h1>
               <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                4 Passed · 0 Failed
+                4 项通过 · 0 项失败
               </span>
             </div>
             <p class="mt-1.5 text-sm text-gray-600 dark:text-gray-400 max-w-xl">
-              Write assertions to test that your EasyTier packet filter rules and ACL policies behave as expected.
+              编写测试断言，验证 EasyTier 数据包过滤规则与安全标签是否符合预期。
             </p>
           </div>
 
@@ -647,15 +604,15 @@ const addNewMockDevice = () => {
               class="inline-flex items-center gap-2 px-3.5 h-9 rounded-md border border-gray-300 dark:border-[#383737] bg-white dark:bg-[#282727] hover:bg-gray-50 dark:hover:bg-[#302f2f] text-gray-700 dark:text-gray-200 font-medium text-sm transition-all shadow-2xs active:scale-[0.98] cursor-pointer"
             >
               <RotateCw class="w-3.5 h-3.5" :class="{ 'animate-spin': isRunningTests }" />
-              <span>Run all tests</span>
+              <span>运行全部测试</span>
             </button>
             <button
-              @click="showToast('添加新的 ACL 规则断言测试')"
+              @click="showToast('添加新的 ACL 访问控制测试用例')"
               type="button"
               class="inline-flex items-center gap-2 px-3.5 h-9 rounded-md bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 text-white font-medium text-sm transition-all shadow-2xs active:scale-[0.98] cursor-pointer"
             >
               <Plus class="w-4 h-4" />
-              <span>Add test</span>
+              <span>添加测试</span>
             </button>
           </div>
         </header>
@@ -665,12 +622,12 @@ const addNewMockDevice = () => {
           <table class="w-full text-left border-collapse text-xs">
             <thead>
               <tr class="border-b border-gray-200 dark:border-[#2f2e2e] bg-gray-50/70 dark:bg-[#252424] text-gray-500 dark:text-gray-400 font-medium">
-                <th class="py-2.5 px-4">Test Assertion</th>
-                <th class="py-2.5 px-4">Source (Src)</th>
-                <th class="py-2.5 px-4">Destination (Dst)</th>
-                <th class="py-2.5 px-4">Expected Action</th>
-                <th class="py-2.5 px-4">Result</th>
-                <th class="py-2.5 px-3 text-right">Actions</th>
+                <th class="py-2.5 px-4">测试断言描述</th>
+                <th class="py-2.5 px-4">源端 (Src)</th>
+                <th class="py-2.5 px-4">目标端 (Dst)</th>
+                <th class="py-2.5 px-4">预期动作</th>
+                <th class="py-2.5 px-4">测试结果</th>
+                <th class="py-2.5 px-3 text-right">操作</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-[#282727]">
@@ -692,8 +649,8 @@ const addNewMockDevice = () => {
                 <td class="py-3 px-4">
                   <span
                     :class="[
-                      'px-2 py-0.5 rounded text-[11px] font-semibold uppercase tracking-wider',
-                      test.action === 'accept'
+                      'px-2 py-0.5 rounded text-[11px] font-semibold tracking-wider',
+                      test.action === '放行'
                         ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
                         : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
                     ]"
@@ -704,15 +661,15 @@ const addNewMockDevice = () => {
                 <td class="py-3 px-4">
                   <div class="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
                     <CheckCircle2 class="w-4 h-4" />
-                    <span>Pass ({{ test.latency }})</span>
+                    <span>通过 ({{ test.latency }})</span>
                   </div>
                 </td>
                 <td class="py-3 px-3 text-right">
                   <button
                     type="button"
-                    @click="showToast(`测试用例 ${test.id} 单独执行通过`)"
-                    class="p-1.5 rounded text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.95] transition-all"
-                    title="Run single test"
+                    @click="showToast(`测试用例 ${test.id} 单独执行验证通过`)"
+                    class="p-1.5 rounded text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.95] transition-all cursor-pointer"
+                    title="单独运行此测试"
                   >
                     <Play class="w-3.5 h-3.5 text-blue-600" />
                   </button>
@@ -722,39 +679,39 @@ const addNewMockDevice = () => {
           </table>
 
           <div class="px-4 py-2.5 border-t border-gray-100 dark:border-[#2f2e2e] bg-gray-50/50 dark:bg-[#252424] flex items-center justify-between text-[11px] text-gray-500">
-            <span>All EasyTier packet filters and ACL rules match desired security boundary.</span>
-            <span class="font-mono">Policy Hash: sha256:7b91d3e8</span>
+            <span>当前所有 EasyTier 数据包过滤防火墙策略均符合预期安全边界。</span>
+            <span class="font-mono">策略校验哈希: sha256:7b91d3e8</span>
           </div>
         </div>
       </main>
 
-      <!-- -------------------- 视图 B: 当 activeSubNav === 'machines' 时呈现 (Machines 设备管理) -------------------- -->
+      <!-- -------------------- 视图 B: 当 activeSubNav === 'machines' 时呈现 (核心设备列表管理) -------------------- -->
       <main v-else class="w-full mx-auto pb-20 pt-6 px-4 sm:px-8 lg:px-10 max-w-6xl">
         <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6">
           <div>
             <div class="flex items-center gap-3">
               <h1 class="text-3xl font-semibold tracking-tight text-gray-900 dark:text-white">
-                Machines
+                设备节点
               </h1>
               <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
-                {{ nodes.length }} devices
+                {{ nodes.length }} 台设备
               </span>
             </div>
             <p class="mt-1.5 text-sm text-gray-600 dark:text-gray-400 max-w-xl">
-              Manage the devices connected to your tailnet.
+              管理加入当前 EasyTier 虚拟局域网的全部设备与路由器。
               <a
-                href="https://tailscale.com/docs/features/access-control/device-management"
+                href="https://easytier.top"
                 target="_blank"
                 rel="noopener"
                 class="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-0.5 ml-1"
               >
-                See how to manage devices
+                查看网络管理文档
                 <ArrowUpRight class="w-3.5 h-3.5" />
               </a>
             </p>
           </div>
 
-          <!-- 右侧 Add device 按钮与主题切换 -->
+          <!-- 右侧操作栏：主题切换与添加设备按钮 -->
           <div class="flex items-center gap-2.5">
             <ThemeToggle class="hidden sm:inline-flex" />
             <button
@@ -762,20 +719,20 @@ const addNewMockDevice = () => {
               type="button"
               class="inline-flex items-center gap-2 px-3.5 h-9 rounded-md bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 text-white font-medium text-sm transition-all shadow-2xs active:scale-[0.98] cursor-pointer"
             >
-              <span>Add device</span>
+              <span>添加设备</span>
               <ChevronDown class="w-4 h-4 opacity-80" />
             </button>
           </div>
         </header>
 
-        <!-- 新手引导卡片 -->
+        <!-- 新手引导卡片 (汉化版) -->
         <section v-if="!isBannerMinimized" class="mb-8">
           <div class="rounded-lg border border-blue-200/80 dark:border-blue-900/40 relative overflow-hidden bg-blue-50/60 dark:bg-blue-950/20 shadow-2xs">
             <button
               type="button"
               @click="isBannerMinimized = true"
               class="absolute right-2 top-2 p-1.5 rounded-md text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-blue-100/60 dark:hover:bg-blue-900/40 active:scale-[0.95] transition-all z-20 cursor-pointer"
-              title="Minimize banner"
+              title="最小化提示横幅"
             >
               <Minus class="w-4 h-4" />
             </button>
@@ -783,24 +740,24 @@ const addNewMockDevice = () => {
             <div class="grid grid-cols-1 md:grid-cols-12 items-center">
               <div class="md:col-span-7 p-6 sm:p-7 flex flex-col justify-center gap-3.5">
                 <h4 class="font-semibold text-lg text-gray-900 dark:text-white">
-                  Add your first device
+                  接入您的第一台设备
                 </h4>
                 <p class="text-xs sm:text-sm text-gray-600 dark:text-gray-300">
-                  How to connect devices to your secure, private network:
+                  三步即可将设备加入安全加密的去中心化 P2P 局域网：
                 </p>
 
                 <ol class="space-y-2.5 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
                   <li class="flex items-start gap-2.5">
                     <span class="flex shrink-0 items-center justify-center rounded-full bg-gray-700 dark:bg-gray-300 text-white dark:text-gray-900 text-xs font-bold w-4.5 h-4.5 mt-0.5">1</span>
-                    <span>Install EasyTier on your first device like a laptop or phone.</span>
+                    <span>在第一台设备（如家庭服务器或 NAS）上安装并启动 EasyTier 核心。</span>
                   </li>
                   <li class="flex items-start gap-2.5">
                     <span class="flex shrink-0 items-center justify-center rounded-full bg-gray-700 dark:bg-gray-300 text-white dark:text-gray-900 text-xs font-bold w-4.5 h-4.5 mt-0.5">2</span>
-                    <span>Install EasyTier on another device like a desktop or server.</span>
+                    <span>在另一台设备（如笔记本或云主机）上使用相同的网络名称加入网络。</span>
                   </li>
                   <li class="flex items-start gap-2.5">
                     <span class="flex shrink-0 items-center justify-center rounded-full bg-gray-700 dark:bg-gray-300 text-white dark:text-gray-900 text-xs font-bold w-4.5 h-4.5 mt-0.5">3</span>
-                    <span class="font-medium text-gray-900 dark:text-white">Now you can access them from anywhere!</span>
+                    <span class="font-medium text-gray-900 dark:text-white">自动完成打洞并建立点对点直连，随时随地极速访问！</span>
                   </li>
                 </ol>
 
@@ -810,12 +767,12 @@ const addNewMockDevice = () => {
                     type="button"
                     class="inline-flex items-center px-3.5 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 text-white text-xs font-semibold transition-all active:scale-[0.98] cursor-pointer"
                   >
-                    Add first device
+                    获取接入命令
                   </button>
                 </div>
               </div>
 
-              <!-- Tailscale 原生矢量波浪图 -->
+              <!-- Tailscale 经典波浪曲线几何矢量艺术图 -->
               <div class="hidden md:flex md:col-span-5 h-full items-end justify-end overflow-hidden p-2">
                 <svg width="280" height="175" viewBox="0 0 325 195" fill="none" xmlns="http://www.w3.org/2000/svg" class="dark:hidden select-none">
                   <path d="M259.465 194.6C223.632 194.6 194.598 165.566 194.598 129.733L259.465 129.733L259.465 194.6Z" fill="#ADC7FC"/>
@@ -851,7 +808,7 @@ const addNewMockDevice = () => {
           </div>
         </section>
 
-        <!-- 药丸过滤控制条 -->
+        <!-- 药丸过滤控制条 (全中文) -->
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div class="flex items-center p-1 rounded-md bg-gray-200/70 dark:bg-gray-800 text-xs font-medium w-fit">
             <button
@@ -864,7 +821,7 @@ const addNewMockDevice = () => {
                   : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
               ]"
             >
-              All ({{ nodes.length }})
+              全部 ({{ nodes.length }})
             </button>
             <button
               type="button"
@@ -876,7 +833,7 @@ const addNewMockDevice = () => {
                   : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
               ]"
             >
-              Connected ({{ nodes.filter(n => n.status === 'online').length }})
+              在线连通 ({{ nodes.filter(n => n.status === 'online').length }})
             </button>
             <button
               type="button"
@@ -888,7 +845,7 @@ const addNewMockDevice = () => {
                   : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
               ]"
             >
-              Exit nodes ({{ nodes.filter(n => n.isExitNode).length }})
+              出口网关 ({{ nodes.filter(n => n.isExitNode).length }})
             </button>
             <button
               type="button"
@@ -900,7 +857,7 @@ const addNewMockDevice = () => {
                   : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
               ]"
             >
-              Offline ({{ nodes.filter(n => n.status === 'offline').length }})
+              离线设备 ({{ nodes.filter(n => n.status === 'offline').length }})
             </button>
           </div>
 
@@ -909,23 +866,23 @@ const addNewMockDevice = () => {
             <input
               v-model="searchQuery"
               type="text"
-              placeholder="Search by name, IP, or tag..."
+              placeholder="搜索设备名称、IP 地址或标签..."
               class="w-full pl-9 pr-3 py-1.5 text-xs rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#282727] text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
             />
           </div>
         </div>
 
-        <!-- Machines 表格 -->
+        <!-- Machines 设备列表表格 -->
         <div class="border border-gray-200 dark:border-[#2f2e2e] rounded-lg overflow-hidden bg-white dark:bg-[#1f1e1e] shadow-2xs">
           <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-xs">
               <thead>
                 <tr class="border-b border-gray-200 dark:border-[#2f2e2e] bg-gray-50/70 dark:bg-[#252424] text-gray-500 dark:text-gray-400 font-medium">
-                  <th class="py-2.5 px-4">Machine</th>
-                  <th class="py-2.5 px-4">Addresses (IPv4 / IPv6)</th>
-                  <th class="py-2.5 px-4">Last seen</th>
-                  <th class="py-2.5 px-4">Routing / Capabilities</th>
-                  <th class="py-2.5 px-3 text-right">Actions</th>
+                  <th class="py-2.5 px-4">设备名称 / 平台</th>
+                  <th class="py-2.5 px-4">虚拟双栈地址 (IPv4 / IPv6)</th>
+                  <th class="py-2.5 px-4">连接状态 / P2P 链路</th>
+                  <th class="py-2.5 px-4">内网子网 / 路由宣告</th>
+                  <th class="py-2.5 px-3 text-right">操作</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100 dark:divide-[#282727]">
@@ -956,7 +913,7 @@ const addNewMockDevice = () => {
                             {{ node.hostname }}
                           </span>
                           <span v-if="node.isExitNode" class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                            Exit node
+                            出口网关
                           </span>
                         </div>
                         <div class="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1.5 mt-0.5">
@@ -979,26 +936,28 @@ const addNewMockDevice = () => {
 
                   <td class="py-3 px-4 font-mono text-[11px]" @click.stop>
                     <div class="space-y-1">
+                      <!-- IPv4 -->
                       <div class="flex items-center gap-1.5">
-                        <span class="text-gray-900 dark:text-gray-200">{{ node.ipv4 }}</span>
+                        <span class="text-gray-900 dark:text-gray-200 font-medium">{{ node.ipv4 }}</span>
                         <button
                           type="button"
                           @click="copyText(node.ipv4, 'IPv4')"
-                          class="p-1 rounded text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200/50 dark:hover:bg-gray-700 active:scale-[0.95] transition-all"
-                          title="Copy IPv4"
+                          class="p-1 rounded text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200/50 dark:hover:bg-gray-700 active:scale-[0.95] transition-all cursor-pointer"
+                          title="复制 IPv4 地址"
                         >
                           <component :is="copiedKey === node.ipv4 ? Check : Copy" class="w-3 h-3 text-emerald-500" v-if="copiedKey === node.ipv4" />
                           <Copy class="w-3 h-3" v-else />
                         </button>
                       </div>
 
+                      <!-- IPv6 -->
                       <div class="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
                         <span class="truncate max-w-[140px]">{{ node.ipv6 }}</span>
                         <button
                           type="button"
                           @click="copyText(node.ipv6, 'IPv6')"
-                          class="p-1 rounded text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200/50 dark:hover:bg-gray-700 active:scale-[0.95] transition-all"
-                          title="Copy IPv6"
+                          class="p-1 rounded text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200/50 dark:hover:bg-gray-700 active:scale-[0.95] transition-all cursor-pointer"
+                          title="复制 IPv6 地址"
                         >
                           <component :is="copiedKey === node.ipv6 ? Check : Copy" class="w-3 h-3 text-emerald-500" v-if="copiedKey === node.ipv6" />
                           <Copy class="w-3 h-3" v-else />
@@ -1012,11 +971,11 @@ const addNewMockDevice = () => {
                       <span :class="['font-medium', node.status === 'online' ? 'text-gray-800 dark:text-gray-200' : 'text-gray-400']">
                         {{ node.lastSeen }}
                       </span>
-                      <div v-if="node.status === 'online'" class="flex items-center gap-1 text-[11px] mt-0.5">
+                      <div v-if="node.status === 'online'" class="flex items-center gap-1.5 text-[11px] mt-0.5">
                         <span
                           :class="[
                             'px-1.5 py-0.2 rounded font-semibold',
-                            node.connection === 'Direct'
+                            node.connection === '直连 P2P'
                               ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
                               : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
                           ]"
@@ -1034,18 +993,18 @@ const addNewMockDevice = () => {
                         <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-50 text-blue-700 dark:bg-blue-950/80 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                           {{ sub }}
                         </span>
-                        <span v-if="node.isSubnetApproved" class="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Approved</span>
+                        <span v-if="node.isSubnetApproved" class="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">已放行</span>
                       </div>
                     </div>
-                    <span v-else class="text-gray-400 dark:text-gray-600 text-[11px]">-</span>
+                    <span v-else class="text-gray-400 dark:text-gray-600 text-[11px]">无子网广播</span>
                   </td>
 
                   <td class="py-3 px-3 text-right" @click.stop>
                     <button
                       type="button"
                       @click="openDrawer(node)"
-                      class="p-1.5 rounded text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.95] transition-all"
-                      title="Machine options"
+                      class="p-1.5 rounded text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.95] transition-all cursor-pointer"
+                      title="打开节点配置抽屉"
                     >
                       <MoreVertical class="w-4 h-4" />
                     </button>
@@ -1056,15 +1015,18 @@ const addNewMockDevice = () => {
           </div>
 
           <div class="px-4 py-2.5 border-t border-gray-100 dark:border-[#2f2e2e] bg-gray-50/50 dark:bg-[#252424] flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400">
-            <span>Showing {{ filteredNodes.length }} of {{ nodes.length }} machines</span>
-            <span>EasyTier mesh network active · 0 packet loss</span>
+            <span>当前显示 {{ filteredNodes.length }} 台设备（共 {{ nodes.length }} 台）</span>
+            <span class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+              EasyTier Mesh 拓扑网络全连通 · 0 丢包
+            </span>
           </div>
         </div>
 
       </main>
     </div>
 
-    <!-- ==================== 右侧机器详情抽屉 ==================== -->
+    <!-- ==================== 右侧机器详情抽屉 (全中文) ==================== -->
     <div
       v-if="drawerOpen"
       class="fixed inset-0 z-50 overflow-hidden bg-black/40 backdrop-blur-xs flex justify-end transition-opacity"
@@ -1089,7 +1051,7 @@ const addNewMockDevice = () => {
           <button
             type="button"
             @click="drawerOpen = false"
-            class="p-1.5 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.95] transition-all"
+            class="p-1.5 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.95] transition-all cursor-pointer"
           >
             <X class="w-5 h-5" />
           </button>
@@ -1106,7 +1068,7 @@ const addNewMockDevice = () => {
                 : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
             ]"
           >
-            Machine Details
+            节点详情
           </button>
           <button
             type="button"
@@ -1118,7 +1080,7 @@ const addNewMockDevice = () => {
                 : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
             ]"
           >
-            Subnets & Exit
+            子网与出口路由
           </button>
           <button
             type="button"
@@ -1130,7 +1092,7 @@ const addNewMockDevice = () => {
                 : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
             ]"
           >
-            P2P Peers ({{ activeNode?.peersList?.length || 0 }})
+            P2P 对端链路 ({{ activeNode?.peersList?.length || 0 }})
           </button>
           <button
             type="button"
@@ -1142,15 +1104,16 @@ const addNewMockDevice = () => {
                 : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
             ]"
           >
-            EasyTier TOML
+            TOML 配置文件
           </button>
         </div>
 
         <div class="flex-1 overflow-y-auto p-5 space-y-6 text-xs">
+          <!-- 节点详情 Tab -->
           <div v-if="drawerTab === 'details'" class="space-y-4">
             <div class="space-y-3">
               <div>
-                <label class="block text-gray-500 dark:text-gray-400 mb-1 font-medium">Machine Name</label>
+                <label class="block text-gray-500 dark:text-gray-400 mb-1 font-medium">设备主机名 (Hostname)</label>
                 <input
                   v-model="activeNode.hostname"
                   type="text"
@@ -1158,42 +1121,68 @@ const addNewMockDevice = () => {
                 />
               </div>
 
+              <!-- 双栈 IP 地址卡 -->
               <div class="p-3 rounded-lg bg-gray-50 dark:bg-[#282727] border border-gray-200 dark:border-[#383737] space-y-2">
                 <div class="flex items-center justify-between">
-                  <span class="text-gray-500">Virtual IPv4</span>
+                  <span class="text-gray-500">虚拟 IPv4 地址</span>
                   <div class="flex items-center gap-1.5 font-mono font-medium">
                     <span>{{ activeNode?.ipv4 }}</span>
-                    <button type="button" @click="copyText(activeNode.ipv4, 'IPv4')" class="text-blue-600 dark:text-blue-400 hover:underline">Copy</button>
+                    <button type="button" @click="copyText(activeNode.ipv4, 'IPv4')" class="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">复制</button>
                   </div>
                 </div>
                 <div class="flex items-center justify-between">
-                  <span class="text-gray-500">Virtual IPv6</span>
+                  <span class="text-gray-500">虚拟 IPv6 地址</span>
                   <div class="flex items-center gap-1.5 font-mono font-medium">
                     <span>{{ activeNode?.ipv6 }}</span>
-                    <button type="button" @click="copyText(activeNode.ipv6, 'IPv6')" class="text-blue-600 dark:text-blue-400 hover:underline">Copy</button>
+                    <button type="button" @click="copyText(activeNode.ipv6, 'IPv6')" class="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">复制</button>
                   </div>
                 </div>
               </div>
 
               <div class="grid grid-cols-2 gap-3">
                 <div class="p-2.5 rounded border border-gray-200 dark:border-gray-800">
-                  <span class="text-gray-500 block mb-0.5">Operating System</span>
+                  <span class="text-gray-500 block mb-0.5">操作系统平台</span>
                   <span class="font-semibold text-gray-900 dark:text-white">{{ activeNode?.os }}</span>
                 </div>
                 <div class="p-2.5 rounded border border-gray-200 dark:border-gray-800">
-                  <span class="text-gray-500 block mb-0.5">EasyTier Core</span>
+                  <span class="text-gray-500 block mb-0.5">EasyTier 内核版本</span>
                   <span class="font-mono font-semibold text-gray-900 dark:text-white">{{ activeNode?.easytierVersion }}</span>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div class="p-2.5 rounded border border-gray-200 dark:border-gray-800">
+                  <span class="text-gray-500 block mb-0.5">NAT 穿透类型</span>
+                  <span class="font-medium text-gray-900 dark:text-white">{{ activeNode?.natType }}</span>
+                </div>
+                <div class="p-2.5 rounded border border-gray-200 dark:border-gray-800">
+                  <span class="text-gray-500 block mb-0.5">直连延迟</span>
+                  <span class="font-medium text-emerald-600 dark:text-emerald-400">{{ activeNode?.connection }} ({{ activeNode?.latencyMs }}ms)</span>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-gray-500 dark:text-gray-400 mb-1 font-medium">安全分组标签 (ACL Tags)</label>
+                <div class="flex flex-wrap gap-1.5 p-2 rounded border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-[#252424]">
+                  <span
+                    v-for="tag in activeNode.tags"
+                    :key="tag"
+                    class="px-2 py-0.5 rounded bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 font-mono text-[11px]"
+                  >
+                    {{ tag }}
+                  </span>
                 </div>
               </div>
             </div>
           </div>
 
+          <!-- 子网与出口路由 Tab -->
           <div v-else-if="drawerTab === 'routing'" class="space-y-4">
             <div class="p-3.5 rounded-lg border border-gray-200 dark:border-gray-800 space-y-2">
               <div class="flex items-center justify-between">
                 <div>
-                  <h4 class="font-semibold text-gray-900 dark:text-white">Use as Exit Node</h4>
-                  <p class="text-gray-500 dark:text-gray-400 text-[11px]">Route all network internet traffic through this machine.</p>
+                  <h4 class="font-semibold text-gray-900 dark:text-white">设为全局出口网关 (Exit Node)</h4>
+                  <p class="text-gray-500 dark:text-gray-400 text-[11px]">允许网络中其他设备通过本节点转发全部互联网外网流量。</p>
                 </div>
                 <input
                   type="checkbox"
@@ -1202,10 +1191,35 @@ const addNewMockDevice = () => {
                 />
               </div>
             </div>
+
+            <div class="p-3.5 rounded-lg border border-gray-200 dark:border-gray-800 space-y-3">
+              <div>
+                <h4 class="font-semibold text-gray-900 dark:text-white">子网路由代理 (Proxy CIDR)</h4>
+                <p class="text-gray-500 dark:text-gray-400 text-[11px]">将本机所在的物理局域网网段广播给虚拟网内的其他对端节点。</p>
+              </div>
+
+              <div v-if="activeNode.subnets.length > 0" class="space-y-2">
+                <div
+                  v-for="sub in activeNode.subnets"
+                  :key="sub"
+                  class="flex items-center justify-between p-2 rounded bg-gray-50 dark:bg-gray-800"
+                >
+                  <span class="font-mono font-medium">{{ sub }}</span>
+                  <div class="flex items-center gap-2">
+                    <span class="text-[11px] text-emerald-600 font-medium">已放行</span>
+                    <input type="checkbox" v-model="activeNode.isSubnetApproved" class="w-3.5 h-3.5 text-blue-600 cursor-pointer" />
+                  </div>
+                </div>
+              </div>
+              <div v-else class="text-gray-400 italic">
+                该节点尚未广播任何物理局域网子网。
+              </div>
+            </div>
           </div>
 
+          <!-- P2P 对端链路 Tab -->
           <div v-else-if="drawerTab === 'peers'" class="space-y-3">
-            <p class="text-gray-500 text-[11px]">Direct P2P links established via EasyTier UDP Hole Punching (STUN/ICE):</p>
+            <p class="text-gray-500 text-[11px]">通过 EasyTier STUN UDP/TCP 打洞建立的真实点对点直连链路：</p>
             <div
               v-for="p in activeNode.peersList"
               :key="p.name"
@@ -1216,30 +1230,41 @@ const addNewMockDevice = () => {
                 <span class="text-emerald-600 dark:text-emerald-400 font-mono text-[11px]">{{ p.latency }}</span>
               </div>
               <div class="flex items-center justify-between text-[11px] text-gray-500">
-                <span>NAT Punch Mode: {{ p.mode }}</span>
-                <span>Tx: {{ p.tx }} / Rx: {{ p.rx }}</span>
+                <span>穿透模式: {{ p.mode }}</span>
+                <span>上行: {{ p.tx }} / 下行: {{ p.rx }}</span>
               </div>
             </div>
           </div>
 
+          <!-- TOML 配置文件 Tab -->
           <div v-else-if="drawerTab === 'toml'" class="space-y-3">
             <div class="flex items-center justify-between">
-              <span class="text-gray-500 font-medium">Live generated easytier.toml</span>
+              <span class="text-gray-500 font-medium">根据当前参数动态生成的 easytier.toml</span>
               <button
                 type="button"
-                @click="copyText(`[network]\ninstance_name = '${activeNode.hostname}'\nipv4 = '${activeNode.ipv4}'\nipv6 = '${activeNode.ipv6}'`, 'TOML Config')"
-                class="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 active:scale-[0.95] transition-all"
+                @click="copyText(`[network_identity]\nnetwork_name = 'default-mesh'\nnetwork_secret = '******'\n\n[host]\nhostname = '${activeNode.hostname}'\n\n[vpn_portal]\nipv4 = '${activeNode.ipv4}/24'\nipv6 = '${activeNode.ipv6}/64'`, 'TOML 配置文件')"
+                class="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 active:scale-[0.95] transition-all cursor-pointer"
               >
                 <Copy class="w-3 h-3" />
-                Copy TOML
+                复制配置
               </button>
             </div>
-            <pre class="p-3 rounded-lg bg-gray-900 text-gray-200 font-mono text-[11px] overflow-x-auto leading-relaxed border border-gray-800">
-# EasyTier Autopilot Machine Spec
-instance_name = "{{ activeNode.hostname }}"
+            <pre class="p-3.5 rounded-lg bg-gray-900 text-gray-200 font-mono text-[11px] overflow-x-auto leading-relaxed border border-gray-800">
+# EasyTier 节点自动生成配置文件
+[network_identity]
+network_name = "default-mesh"
+network_secret = "your_secret_key"
+
+[host]
+hostname = "{{ activeNode.hostname }}"
+
+[vpn_portal]
 ipv4 = "{{ activeNode.ipv4 }}/24"
 ipv6 = "{{ activeNode.ipv6 }}/64"
 exit_node = {{ activeNode.isExitNode }}
+
+[proxy_network]
+proxy_cidrs = [{{ activeNode.subnets.map((s: string) => `"${s}"`).join(', ') }}]
 </pre>
           </div>
         </div>
@@ -1250,20 +1275,20 @@ exit_node = {{ activeNode.isExitNode }}
             @click="drawerOpen = false"
             class="px-3.5 py-1.5 rounded-md border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium active:scale-[0.98] transition-all cursor-pointer"
           >
-            Cancel
+            取消
           </button>
           <button
             type="button"
             @click="saveDrawerChanges"
             class="px-4 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold active:scale-[0.98] transition-all cursor-pointer shadow-2xs"
           >
-            Save changes
+            保存变更
           </button>
         </div>
       </div>
     </div>
 
-    <!-- ==================== Add Device 模态框 ==================== -->
+    <!-- ==================== 添加设备模态框 (全中文 · 移除个人域名) ==================== -->
     <div
       v-if="showAddDeviceModal"
       class="fixed inset-0 z-50 overflow-hidden bg-black/50 backdrop-blur-xs flex items-center justify-center p-4"
@@ -1279,11 +1304,11 @@ exit_node = {{ activeNode.isExitNode }}
               <Plus class="w-5 h-5" />
             </div>
             <div>
-              <h3 class="font-bold text-base text-gray-900 dark:text-white">Add a device to your tailnet</h3>
-              <p class="text-xs text-gray-500">Run EasyTier with zero-configuration peer enrollment</p>
+              <h3 class="font-bold text-base text-gray-900 dark:text-white">添加新设备到 EasyTier 虚拟网</h3>
+              <p class="text-xs text-gray-500">零配置单命令行快速入网指南</p>
             </div>
           </div>
-          <button type="button" @click="showAddDeviceModal = false" class="text-gray-400 hover:text-gray-600 active:scale-[0.95] transition-all">
+          <button type="button" @click="showAddDeviceModal = false" class="text-gray-400 hover:text-gray-600 active:scale-[0.95] transition-all cursor-pointer">
             <X class="w-5 h-5" />
           </button>
         </div>
@@ -1296,7 +1321,7 @@ exit_node = {{ activeNode.isExitNode }}
               type="button"
               @click="selectedOs = os as any"
               :class="[
-                'py-2 px-3 rounded-md font-medium text-center border uppercase tracking-wider transition-all active:scale-[0.98]',
+                'py-2 px-3 rounded-md font-medium text-center border uppercase tracking-wider transition-all active:scale-[0.98] cursor-pointer',
                 selectedOs === os
                   ? 'border-blue-600 bg-blue-50/70 text-blue-700 dark:bg-blue-950 dark:text-blue-300 font-bold'
                   : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
@@ -1308,38 +1333,42 @@ exit_node = {{ activeNode.isExitNode }}
 
           <div class="p-3.5 rounded-lg bg-gray-900 text-gray-100 font-mono space-y-2 border border-gray-800">
             <div class="flex items-center justify-between text-[11px] text-gray-400">
-              <span>One-line join command</span>
+              <span>一键启动加入指令 (Shell)</span>
               <button
                 type="button"
-                @click="copyText(`curl -fsSL https://easytier.top/install.sh | bash && easytier-core --ipv4 10.144.144.${nodes.length + 20} --peers tcp://seelcmo.org:11010`, 'Command')"
-                class="text-blue-400 hover:underline flex items-center gap-1 active:scale-[0.95] transition-all"
+                @click="copyText(`curl -fsSL https://easytier.top/install.sh | bash && easytier-core --ipv4 10.144.144.${nodes.length + 20} --network-name default-mesh --peers tcp://hub.easytier.top:11010`, '启动命令')"
+                class="text-blue-400 hover:underline flex items-center gap-1 active:scale-[0.95] transition-all cursor-pointer"
               >
                 <Copy class="w-3 h-3" />
-                Copy
+                复制
               </button>
             </div>
             <div class="text-[11px] leading-relaxed break-all select-all text-emerald-400">
-              curl -fsSL https://easytier.top/install.sh | bash && easytier-core --ipv4 10.144.144.{{ nodes.length + 20 }} --peers tcp://seelcmo.org:11010
+              curl -fsSL https://easytier.top/install.sh | bash && easytier-core --ipv4 10.144.144.{{ nodes.length + 20 }} --network-name default-mesh --peers tcp://hub.easytier.top:11010
             </div>
           </div>
+
+          <p class="text-gray-500 leading-relaxed text-[11px]">
+            启动后，EasyTier 将自动进行 STUN UDP 探测并建立点对点加密隧道，无需中心服务器转发数据。
+          </p>
         </div>
 
         <div class="p-4 border-t border-gray-200 dark:border-[#2f2e2e] bg-gray-50 dark:bg-[#252424] flex items-center justify-between">
-          <span class="text-gray-500 text-[11px]">No account login required for peer nodes</span>
+          <span class="text-gray-500 text-[11px]">支持直接模拟新节点接入</span>
           <div class="flex items-center gap-2">
             <button
               type="button"
               @click="showAddDeviceModal = false"
               class="px-3.5 py-1.5 rounded-md border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-[0.98] transition-all cursor-pointer"
             >
-              Cancel
+              取消
             </button>
             <button
               type="button"
               @click="addNewMockDevice"
               class="px-4 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-medium active:scale-[0.98] transition-all cursor-pointer"
             >
-              Simulate Device Join
+              模拟设备接入
             </button>
           </div>
         </div>
