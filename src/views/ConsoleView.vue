@@ -48,6 +48,8 @@ import {
   LayoutDashboard,
   Clock,
   ArrowDownLeft,
+  Trash2,
+  Wrench,
 } from 'lucide-vue-next'
 
 // --- 多网络管理状态 (按照“网络为中心”进行管理) ---
@@ -114,7 +116,7 @@ const currentNetwork = computed(() => {
   return managedNetworks.value.find((n) => n.id === currentNetworkId.value) || managedNetworks.value[0]
 })
 
-// 网络流量动态统计 (模拟真实 EasyTier 局域网传输累计与实时速率)
+// 网络流量动态统计 (模拟真实 Mesh 局域网传输累计与实时速率)
 interface NetworkTrafficStats {
   rxTotal: string
   txTotal: string
@@ -124,10 +126,10 @@ interface NetworkTrafficStats {
 
 const networkTrafficMap = ref<Record<string, NetworkTrafficStats>>({
   'net-default': {
-    rxTotal: '148.6 GB',
-    txTotal: '216.4 GB',
-    rxSpeed: '18.2 MB/s',
-    txSpeed: '24.6 MB/s',
+    rxTotal: '0 B',
+    txTotal: '0 B',
+    rxSpeed: '0 B/s',
+    txSpeed: '0 B/s',
   },
   'net-office': {
     rxTotal: '1.42 TB',
@@ -146,10 +148,10 @@ const networkTrafficMap = ref<Record<string, NetworkTrafficStats>>({
 const currentTraffic = computed(() => {
   return (
     networkTrafficMap.value[currentNetworkId.value] || {
-      rxTotal: '148.6 GB',
-      txTotal: '216.4 GB',
-      rxSpeed: '18.2 MB/s',
-      txSpeed: '24.6 MB/s',
+      rxTotal: '0 B',
+      txTotal: '0 B',
+      rxSpeed: '0 B/s',
+      txSpeed: '0 B/s',
     }
   )
 })
@@ -224,8 +226,21 @@ const newNetworkForm = ref({
   secretKey: '',
 })
 
+const advancedSettings = ref({
+  noTunMode: false,
+  magicDns: true,
+  autoStart: true,
+  socks5Proxy: false,
+  socks5Port: 1080,
+  kcpProxy: false,
+  wireguardAccess: false,
+  wireguardPort: 51820,
+  secureMode: false,
+})
+
+
 // --- 导航菜单状态定义 ---
-type SubNavItem = 'network-overview' | 'machines' | 'subnets' | 'stun' | 'policies' | 'tests' | 'toml' | 'logs' | 'settings'
+type SubNavItem = 'network-overview' | 'machines' | 'subnets' | 'stun' | 'policies' | 'tests' | 'toml' | 'logs' | 'settings' | 'advanced'
 const activeSubNav = ref<SubNavItem>('network-overview')
 
 // 侧边栏折叠状态 (桌面端一键收起，只保留图标)
@@ -503,7 +518,7 @@ const onlinePercentage = computed(() => {
 
 const avgLatency = computed(() => {
   const onlineWithLat = nodes.value.filter((n) => n.status === 'online' && n.latencyMs > 0)
-  if (!onlineWithLat.length) return 24
+  if (!onlineWithLat.length) return 0
   const sum = onlineWithLat.reduce((acc, cur) => acc + cur.latencyMs, 0)
   return Math.round(sum / onlineWithLat.length)
 })
@@ -531,7 +546,7 @@ const p2pNodesCount = computed(() => nodes.value.filter((n) => n.status === 'onl
 const relayNodesCount = computed(() => nodes.value.filter((n) => n.status === 'online' && isRelayConnection(n)).length)
 const p2pSuccessRate = computed(() => {
   const total = onlineNodesCount.value
-  if (!total) return '75.0'
+  if (!total) return '0.0'
   return ((p2pNodesCount.value / total) * 100).toFixed(1)
 })
 
@@ -598,7 +613,7 @@ const addNewMockDevice = () => {
   const newNode = {
     id: newId,
     hostname: `node-sg-${nodes.value.length + 1}`,
-    domain: `node-sg-${nodes.value.length + 1}.easytier.local`,
+    domain: `node-sg-${nodes.value.length + 1}.mesh.local`,
     os: 'Linux (x86_64)',
     osType: 'linux',
     locationName: '新加坡中央区',
@@ -628,8 +643,26 @@ const addNewMockDevice = () => {
   showToast(`设备 ${newNode.hostname} (新加坡) 已成功加入当前网络！`)
 }
 
+
+const deleteNetwork = (id: string, name: string) => {
+  if (managedNetworks.value.length <= 1) {
+    showToast('至少保留一个虚拟网络，无法删除最后一个网络。')
+    return
+  }
+  if (!confirm(`确定要删除虚拟网络 "${name}" 吗？此操作不可撤销，且网络下的所有节点将断开连接！`)) return
+  
+  managedNetworks.value = managedNetworks.value.filter(n => n.id !== id)
+  if (currentNetworkId.value === id) {
+    currentNetworkId.value = managedNetworks.value[0].id
+    showToast(`已删除网络 ${name}，并自动切换至 ${managedNetworks.value[0].name}`)
+  } else {
+    showToast(`已成功删除虚拟网络: ${name}`)
+  }
+}
+
 // 新建网络提交
 const createNewNetwork = () => {
+
   if (!newNetworkForm.value.name.trim()) return
   const newNet: ManagedNetwork = {
     id: `net-${Date.now().toString().slice(-4)}`,
@@ -1216,6 +1249,22 @@ const runAllTests = () => {
         >
           <Settings class="w-4 h-4 text-gray-700 dark:text-gray-300" />
           <span>网络设置</span>
+        </button>
+
+        
+        <!-- 6. 高级节点功能 -->
+        <button
+          type="button"
+          @click="activeSubNav = 'advanced'; mobileMenuOpen = false"
+          :class="[
+            'flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-md font-normal text-left transition-all duration-100 active:scale-[0.98] cursor-pointer',
+            activeSubNav === 'advanced'
+              ? 'bg-[#ebebeb] dark:bg-[#2e2d2d] text-gray-900 dark:text-white font-medium'
+              : 'text-gray-800 dark:text-gray-200 hover:bg-gray-200/60 dark:hover:bg-gray-800'
+          ]"
+        >
+          <Wrench class="w-4 h-4 text-gray-700 dark:text-gray-300" />
+          <span>高级节点功能</span>
         </button>
 
         <!-- 底部帮助与文档 -->
@@ -2613,7 +2662,7 @@ enable_exit_node = true
           <!-- TOML 配置文件 Tab -->
           <div v-else-if="drawerTab === 'toml'" class="space-y-3">
             <div class="flex items-center justify-between">
-              <span class="text-gray-500 font-medium">根据当前参数动态生成的 easytier.toml</span>
+              <span class="text-gray-500 font-medium">根据当前参数动态生成的 mesh.toml</span>
               <button
                 type="button"
                 @click="copyText(`[network_identity]\nnetwork_name = '${currentNetwork.name}'\nnetwork_secret = '${currentNetwork.secretKey}'\n\n[host]\nhostname = '${activeNode.hostname}'`, 'TOML 配置文件')"
@@ -2820,7 +2869,7 @@ proxy_cidrs = [{{ (activeNode?.subnets || []).map((s: string) => `"${s}"`).join(
               </div>
 
               <!-- 切换或当前状态按钮 -->
-              <div>
+              <div class="flex items-center gap-2">
                 <button
                   v-if="currentNetworkId !== net.id"
                   type="button"
@@ -2834,6 +2883,16 @@ proxy_cidrs = [{{ (activeNode?.subnets || []).map((s: string) => `"${s}"`).join(
                   <CheckCircle2 class="w-4 h-4" />
                   <span>当前主控中</span>
                 </div>
+                
+                <button
+                  v-if="managedNetworks.length > 1"
+                  type="button"
+                  @click.stop="deleteNetwork(net.id, net.name)"
+                  class="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 active:scale-95 transition-all cursor-pointer"
+                  title="删除网络"
+                >
+                  <Trash2 class="w-4 h-4" />
+                </button>
               </div>
             </div>
 

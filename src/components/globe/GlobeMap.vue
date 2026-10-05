@@ -406,7 +406,7 @@ defineExpose({
           <div class="flex items-center gap-1.5 truncate">
             <Wifi class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
             <span class="truncate font-medium text-gray-800 dark:text-gray-200">
-              {{ selectedDevice ? selectedDevice.hostname : (devices[0]?.hostname || 'EasyTier 网络') }}
+              {{ selectedDevice ? selectedDevice.hostname : (devices[0]?.hostname || 'Mesh 网络') }}
             </span>
             <span class="px-1.5 py-0.2 rounded text-[10px] bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-mono shrink-0">
               +{{ devices.length }}

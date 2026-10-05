@@ -8,7 +8,7 @@
           <Cloud class="w-7 h-7 fill-white/20 stroke-white stroke-[2.2]" />
         </div>
         <h1 class="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-          {{ isRegister ? '注册 EasyTier 账户' : '登录 EasyTier 控制台' }}
+          {{ isRegister ? '注册网络账户' : '登录网络控制台' }}
         </h1>
         <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
           云原生去中心化 Mesh 局域网管控中心
@@ -48,6 +48,23 @@
                 required
                 autocomplete="current-password"
                 placeholder="••••••••"
+                class="w-full pl-9 pr-3 py-2 text-xs rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
+              />
+            </div>
+          </div>
+
+          <!-- 2FA Placeholder (Reserved for future) -->
+          <div v-if="!isRegister">
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex justify-between">
+              <span>双因素认证 (2FA)</span>
+              <span class="text-[10px] text-slate-400 font-normal">可选配置</span>
+            </label>
+            <div class="relative">
+              <ShieldCheck class="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+              <input
+                v-model="form.twoFactorCode"
+                type="text"
+                placeholder="6位动态验证码 (未绑定请留空)"
                 class="w-full pl-9 pr-3 py-2 text-xs rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
               />
             </div>
@@ -146,6 +163,7 @@ const form = ref({
   username: '',
   password: '',
   captcha: '',
+  twoFactorCode: '',
 })
 
 onMounted(() => {
@@ -177,7 +195,7 @@ async function handleSubmit() {
       await authStore.login(form.value.username, form.value.password)
     }
 
-    const redirect = (route.query.redirect as string) || '/networks'
+    const redirect = (route.query.redirect as string) || '/'
     router.push(redirect)
   } catch (err: any) {
     errorMessage.value = err?.response?.data?.message || err?.message || '认证失败，请重试'

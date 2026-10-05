@@ -1,6 +1,18 @@
 import axios, { AxiosInstance, AxiosError } from 'axios'
 import { Md5 } from 'ts-md5'
 
+export function formatUuid(obj: { part1: number; part2: number; part3: number; part4: number }): string {
+  const buf = new Uint8Array(16)
+  const view = new DataView(buf.buffer)
+  view.setUint32(0, obj.part1, false)
+  view.setUint32(4, obj.part2, false)
+  view.setUint32(8, obj.part3, false)
+  view.setUint32(12, obj.part4, false)
+
+  const hex = Array.from(buf).map((b) => b.toString(16).padStart(2, '0')).join('')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
+
 export interface Summary {
   device_count: number
 }

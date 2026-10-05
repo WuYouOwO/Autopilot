@@ -89,7 +89,7 @@ const DEFAULT_PORTS: Record<string, number> = {
 }
 
 /**
- * 健壮解析 EasyTier 节点或监听 URL，原生保护 IPv6 方括号格式
+ * 健壮解析 Mesh 节点或监听 URL，原生保护 IPv6 方括号格式
  */
 export function parseTunnelUrl(urlStr: string): ParsedTunnelUrl {
   const trimmed = urlStr.trim()
