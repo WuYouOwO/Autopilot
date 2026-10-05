@@ -24,11 +24,14 @@ export const router = createRouter({
   routes,
 })
 
-router.beforeEach((to, _from, next) => {
+router.beforeEach((to) => {
   if (to.meta.title) {
     document.title = `${to.meta.title} · EasyTier Autopilot`
   }
-  next()
+})
+
+router.onError((err) => {
+  console.error('路由导航异常:', err)
 })
 
 export default router

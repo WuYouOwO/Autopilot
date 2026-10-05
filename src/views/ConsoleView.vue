@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
-import GlobeMap, { type GlobeDevice } from '@/components/globe/GlobeMap.vue'
+import GlobeMap from '@/components/globe/GlobeMap.vue'
+import type { GlobeDevice } from '@/types/globe'
 import {
   Network,
   Lock,
@@ -319,8 +320,17 @@ const filteredNodes = computed(() => {
   })
 })
 
-const openDrawer = (node: any) => {
-  activeNode.value = JSON.parse(JSON.stringify(node))
+const openDrawer = (nodeOrDevice: any) => {
+  if (!nodeOrDevice) return
+  const fullNode = nodes.value.find((n) => n.id === nodeOrDevice.id) || nodeOrDevice
+  const clone = JSON.parse(JSON.stringify(fullNode))
+  if (!Array.isArray(clone.subnets)) clone.subnets = []
+  if (!Array.isArray(clone.tags)) clone.tags = []
+  if (!Array.isArray(clone.listeners)) clone.listeners = []
+  if (!Array.isArray(clone.peersList)) clone.peersList = []
+  if (clone.isExitNode === undefined) clone.isExitNode = false
+  if (clone.isSubnetApproved === undefined) clone.isSubnetApproved = false
+  activeNode.value = clone
   drawerOpen.value = true
 }
 
@@ -1728,9 +1738,9 @@ enable_exit_node = true
                 <p class="text-gray-500 dark:text-gray-400 text-[11px]">将本机所在的物理局域网网段广播给虚拟网内的其他对端节点。</p>
               </div>
 
-              <div v-if="activeNode.subnets.length > 0" class="space-y-2">
+              <div v-if="activeNode?.subnets && activeNode.subnets.length > 0" class="space-y-2">
                 <div
-                  v-for="sub in activeNode.subnets"
+                  v-for="sub in (activeNode?.subnets || [])"
                   :key="sub"
                   class="flex items-center justify-between p-2 rounded bg-gray-50 dark:bg-gray-800"
                 >
@@ -1751,7 +1761,7 @@ enable_exit_node = true
           <div v-else-if="drawerTab === 'peers'" class="space-y-3">
             <p class="text-gray-500 text-[11px]">通过 EasyTier STUN UDP/TCP 打洞建立的真实点对点直连链路：</p>
             <div
-              v-for="p in activeNode.peersList"
+              v-for="p in (activeNode?.peersList || [])"
               :key="p.name"
               class="p-3 rounded-lg border border-gray-200 dark:border-gray-800 space-y-1.5"
             >
@@ -1794,7 +1804,7 @@ ipv6 = "{{ activeNode.ipv6 }}/64"
 exit_node = {{ activeNode.isExitNode }}
 
 [proxy_network]
-proxy_cidrs = [{{ activeNode.subnets.map((s: string) => `"${s}"`).join(', ') }}]
+proxy_cidrs = [{{ (activeNode?.subnets || []).map((s: string) => `"${s}"`).join(', ') }}]
 </pre>
           </div>
         </div>

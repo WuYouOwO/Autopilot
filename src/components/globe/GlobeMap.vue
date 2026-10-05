@@ -12,24 +12,11 @@ import {
   RefreshCw,
   X,
   ExternalLink,
+  ArrowUpRight,
+  AlertTriangle,
 } from 'lucide-vue-next'
-
-export interface GlobeDevice {
-  id: string
-  hostname: string
-  locationName: string
-  countryCode: string
-  publicIp: string
-  ipv4: string
-  ipv6: string
-  lat: number
-  lng: number
-  status: 'online' | 'offline'
-  connection: string
-  latencyMs: number
-  natType: string
-  peers?: string[]
-}
+import type { GlobeDevice } from '@/types/globe'
+export type { GlobeDevice } from '@/types/globe'
 
 const props = defineProps<{
   devices: GlobeDevice[]
@@ -43,6 +30,7 @@ const emit = defineEmits<{
 const containerRef = ref<HTMLDivElement | null>(null)
 const selectedDevice = ref<GlobeDevice | null>(null)
 const isRotating = ref(true)
+const webGlError = ref(false)
 const autoRotateSpeed = 0.002
 
 let scene: THREE.Scene
@@ -57,10 +45,14 @@ let previousMousePosition = { x: 0, y: 0 }
 let targetRotation = { x: 0.2, y: 0 }
 let currentRotation = { x: 0.2, y: 0 }
 
+const onMouseUp = () => {
+  isDragging = false
+}
+
 // 经纬度转 3D 笛卡尔坐标 (半径 R)
 const latLngToVector3 = (lat: number, lng: number, radius: number): THREE.Vector3 => {
-  const phi = (90 - lat) * (Math.PI / 180)
-  const theta = (lng + 180) * (Math.PI / 180)
+  const phi = (90 - (lat || 0)) * (Math.PI / 180)
+  const theta = ((lng || 0) + 180) * (Math.PI / 180)
 
   const x = -(radius * Math.sin(phi) * Math.cos(theta))
   const z = radius * Math.sin(phi) * Math.sin(theta)
@@ -95,20 +87,21 @@ const createCurvedArc = (startVec: THREE.Vector3, endVec: THREE.Vector3, colorHe
 // 初始化 Three.js 场景
 const initThree = () => {
   if (!containerRef.value) return
-  const width = containerRef.value.clientWidth || 800
-  const height = containerRef.value.clientHeight || 500
+  try {
+    const width = containerRef.value.clientWidth || 800
+    const height = containerRef.value.clientHeight || 500
 
-  scene = new THREE.Scene()
-  camera = new THREE.PerspectiveCamera(45, width / height, 1, 2000)
-  camera.position.z = 280
+    scene = new THREE.Scene()
+    camera = new THREE.PerspectiveCamera(45, width / height, 1, 2000)
+    camera.position.z = 280
 
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
-  renderer.setSize(width, height)
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-  containerRef.value.appendChild(renderer.domElement)
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
+    renderer.setSize(width, height)
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    containerRef.value.appendChild(renderer.domElement)
 
-  globeGroup = new THREE.Group()
-  scene.add(globeGroup)
+    globeGroup = new THREE.Group()
+    scene.add(globeGroup)
 
   const RADIUS = 100
 
@@ -206,22 +199,50 @@ const initThree = () => {
     }
   }
 
-  // 7. 鼠标交互事件监听
-  const dom = renderer.domElement
+    // 7. 鼠标交互事件监听
+    const dom = renderer.domElement
 
-  dom.addEventListener('mousedown', (e) => {
-    isDragging = true
-    isRotating.value = false
-    previousMousePosition = { x: e.clientX, y: e.clientY }
-  })
+    dom.addEventListener('mousedown', (e) => {
+      isDragging = true
+      isRotating.value = false
+      previousMousePosition = { x: e.clientX, y: e.clientY }
+    })
 
-  window.addEventListener('mouseup', () => {
-    isDragging = false
-  })
+    window.addEventListener('mouseup', onMouseUp)
 
-  dom.addEventListener('mousemove', (e) => {
-    if (!isDragging) {
-      // 射线检测鼠标悬浮的节点
+    dom.addEventListener('mousemove', (e) => {
+      if (!isDragging) {
+        // 射线检测鼠标悬浮的节点
+        const rect = dom.getBoundingClientRect()
+        const mouse = new THREE.Vector2(
+          ((e.clientX - rect.left) / width) * 2 - 1,
+          -((e.clientY - rect.top) / height) * 2 + 1
+        )
+        const raycaster = new THREE.Raycaster()
+        raycaster.setFromCamera(mouse, camera)
+        const intersects = raycaster.intersectObjects(nodeMarkers)
+        if (intersects.length > 0) {
+          dom.style.cursor = 'pointer'
+        } else {
+          dom.style.cursor = 'grab'
+        }
+        return
+      }
+
+      const deltaX = e.clientX - previousMousePosition.x
+      const deltaY = e.clientY - previousMousePosition.y
+
+      targetRotation.y += deltaX * 0.005
+      targetRotation.x += deltaY * 0.005
+
+      // 限制俯仰角度，避免翻滚
+      targetRotation.x = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, targetRotation.x))
+
+      previousMousePosition = { x: e.clientX, y: e.clientY }
+    })
+
+    // 点击选择节点
+    dom.addEventListener('click', (e) => {
       const rect = dom.getBoundingClientRect()
       const mouse = new THREE.Vector2(
         ((e.clientX - rect.left) / width) * 2 - 1,
@@ -231,72 +252,46 @@ const initThree = () => {
       raycaster.setFromCamera(mouse, camera)
       const intersects = raycaster.intersectObjects(nodeMarkers)
       if (intersects.length > 0) {
-        dom.style.cursor = 'pointer'
-      } else {
-        dom.style.cursor = 'grab'
+        const dev = intersects[0].object.userData as GlobeDevice
+        selectedDevice.value = dev
+        emit('select-device', dev)
       }
-      return
-    }
+    })
 
-    const deltaX = e.clientX - previousMousePosition.x
-    const deltaY = e.clientY - previousMousePosition.y
-
-    targetRotation.y += deltaX * 0.005
-    targetRotation.x += deltaY * 0.005
-
-    // 限制俯仰角度，避免翻滚
-    targetRotation.x = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, targetRotation.x))
-
-    previousMousePosition = { x: e.clientX, y: e.clientY }
-  })
-
-  // 点击选择节点
-  dom.addEventListener('click', (e) => {
-    const rect = dom.getBoundingClientRect()
-    const mouse = new THREE.Vector2(
-      ((e.clientX - rect.left) / width) * 2 - 1,
-      -((e.clientY - rect.top) / height) * 2 + 1
+    // 滚轮缩放控制
+    dom.addEventListener(
+      'wheel',
+      (e) => {
+        e.preventDefault()
+        camera.position.z += e.deltaY * 0.15
+        camera.position.z = Math.max(180, Math.min(450, camera.position.z))
+      },
+      { passive: false }
     )
-    const raycaster = new THREE.Raycaster()
-    raycaster.setFromCamera(mouse, camera)
-    const intersects = raycaster.intersectObjects(nodeMarkers)
-    if (intersects.length > 0) {
-      const dev = intersects[0].object.userData as GlobeDevice
-      selectedDevice.value = dev
-      emit('select-device', dev)
-    }
-  })
 
-  // 滚轮缩放控制
-  dom.addEventListener(
-    'wheel',
-    (e) => {
-      e.preventDefault()
-      camera.position.z += e.deltaY * 0.15
-      camera.position.z = Math.max(180, Math.min(450, camera.position.z))
-    },
-    { passive: false }
-  )
+    // 8. 渲染循环
+    const animate = () => {
+      animationFrameId = requestAnimationFrame(animate)
 
-  // 8. 渲染循环
-  const animate = () => {
-    animationFrameId = requestAnimationFrame(animate)
+      // 自动自转与惯性插值
+      if (isRotating.value) {
+        targetRotation.y += autoRotateSpeed
+      }
 
-    // 自动自转与惯性插值
-    if (isRotating.value) {
-      targetRotation.y += autoRotateSpeed
+      currentRotation.x += (targetRotation.x - currentRotation.x) * 0.1
+      currentRotation.y += (targetRotation.y - currentRotation.y) * 0.1
+
+      globeGroup.rotation.x = currentRotation.x
+      globeGroup.rotation.y = currentRotation.y
+
+      renderer.render(scene, camera)
     }
 
-    currentRotation.x += (targetRotation.x - currentRotation.x) * 0.1
-    currentRotation.y += (targetRotation.y - currentRotation.y) * 0.1
-
-    globeGroup.rotation.x = currentRotation.x
-    globeGroup.rotation.y = currentRotation.y
-
-    renderer.render(scene, camera)
+    animate()
+  } catch (err) {
+    webGlError.value = true
+    console.warn('WebGL initialization failed, falling back to 2D view:', err)
   }
-
-  animate()
 }
 
 // 聚焦到指定设备
@@ -305,8 +300,8 @@ const focusOnDevice = (dev: GlobeDevice) => {
   isRotating.value = false
 
   // 计算对应经纬度应该对准相机的旋转角度
-  const targetY = -((dev.lng + 180) * (Math.PI / 180)) + Math.PI / 2
-  const targetX = (dev.lat * (Math.PI / 180)) * 0.6
+  const targetY = -(((dev.lng || 0) + 180) * (Math.PI / 180)) + Math.PI / 2
+  const targetX = ((dev.lat || 0) * (Math.PI / 180)) * 0.6
 
   targetRotation.y = targetY
   targetRotation.x = targetX
@@ -328,8 +323,11 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  cancelAnimationFrame(animationFrameId)
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId)
+  }
   window.removeEventListener('resize', handleResize)
+  window.removeEventListener('mouseup', onMouseUp)
   if (renderer && renderer.domElement) {
     renderer.dispose()
   }
@@ -344,22 +342,57 @@ defineExpose({
 <template>
   <div class="relative w-full h-[520px] rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-[#f8fafc] dark:bg-[#151d2c] overflow-hidden select-none shadow-2xs">
     
-    <!-- Three.js WebGL 画布容器 -->
-    <div ref="containerRef" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
-
-    <!-- 顶部浮动控制工具条 -->
-    <div class="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none">
-      <div class="flex items-center gap-2 pointer-events-auto bg-white/90 dark:bg-gray-900/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-800 shadow-2xs">
-        <Globe class="w-4 h-4 text-blue-600 dark:text-blue-400" />
-        <span class="text-xs font-semibold text-gray-900 dark:text-white">EasyTier 全球设备空间分布</span>
-        <span class="text-[10px] px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-medium">
-          {{ devices.filter(d => d.status === 'online').length }} 节点在线
-        </span>
+    <!-- WebGL 不可用或报错时的优雅降级 -->
+    <div v-if="webGlError" class="w-full h-full p-6 flex flex-col justify-between">
+      <div class="flex items-center justify-between pb-3 border-b border-gray-200 dark:border-gray-800">
+        <div class="flex items-center gap-2">
+          <Globe class="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          <h3 class="font-bold text-gray-900 dark:text-white text-base">全球节点拓扑空间概览</h3>
+        </div>
+        <span class="text-xs text-gray-400">已开启轻量 2D 拓扑视图</span>
       </div>
 
-      <!-- 旋转与重置控制 -->
-      <div class="flex items-center gap-1.5 pointer-events-auto bg-white/90 dark:bg-gray-900/90 backdrop-blur-md p-1 rounded-lg border border-gray-200 dark:border-gray-800 shadow-2xs">
-        <button
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 my-auto">
+        <div
+          v-for="dev in devices"
+          :key="dev.id"
+          @click="emit('select-device', dev)"
+          class="p-3.5 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/60 hover:border-blue-500 cursor-pointer transition-all space-y-1.5"
+        >
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-sm text-gray-900 dark:text-white">{{ dev.hostname }}</span>
+            <span :class="['w-2 h-2 rounded-full', dev.status === 'online' ? 'bg-emerald-500' : 'bg-gray-400']"></span>
+          </div>
+          <div class="text-xs text-gray-500">{{ dev.locationName }}</div>
+          <div class="flex items-center justify-between font-mono text-[11px] pt-1 border-t border-gray-100 dark:border-gray-800 text-gray-400">
+            <span>{{ dev.publicIp }}</span>
+            <span class="text-blue-600 dark:text-blue-400 font-semibold">{{ dev.ipv4 }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="text-xs text-gray-400 text-center">
+        点击节点卡片可展开右侧详细参数抽屉并配置路由
+      </div>
+    </div>
+
+    <!-- 正常 WebGL Three.js 画布容器 -->
+    <template v-else>
+      <div ref="containerRef" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
+
+      <!-- 顶部浮动控制工具条 -->
+      <div class="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none">
+        <div class="flex items-center gap-2 pointer-events-auto bg-white/90 dark:bg-gray-900/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-800 shadow-2xs">
+          <Globe class="w-4 h-4 text-blue-600 dark:text-blue-400" />
+          <span class="text-xs font-semibold text-gray-900 dark:text-white">EasyTier 全球设备空间分布</span>
+          <span class="text-[10px] px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-medium">
+            {{ devices.filter(d => d.status === 'online').length }} 节点在线
+          </span>
+        </div>
+
+        <!-- 旋转与重置控制 -->
+        <div class="flex items-center gap-1.5 pointer-events-auto bg-white/90 dark:bg-gray-900/90 backdrop-blur-md p-1 rounded-lg border border-gray-200 dark:border-gray-800 shadow-2xs">
+          <button
           type="button"
           @click="isRotating = !isRotating"
           :class="[
@@ -472,6 +505,7 @@ defineExpose({
         </div>
       </div>
     </transition>
+    </template>
 
   </div>
 </template>
