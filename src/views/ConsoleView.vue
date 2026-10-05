@@ -44,6 +44,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   LayoutDashboard,
+  Clock,
+  ArrowDownLeft,
 } from 'lucide-vue-next'
 
 // --- 多网络管理状态 (按照“网络为中心”进行管理) ---
@@ -108,6 +110,46 @@ const managedNetworks = ref<ManagedNetwork[]>([
 const currentNetworkId = ref<string>('net-default')
 const currentNetwork = computed(() => {
   return managedNetworks.value.find((n) => n.id === currentNetworkId.value) || managedNetworks.value[0]
+})
+
+// 网络流量动态统计 (模拟真实 EasyTier 局域网传输累计与实时速率)
+interface NetworkTrafficStats {
+  rxTotal: string
+  txTotal: string
+  rxSpeed: string
+  txSpeed: string
+}
+
+const networkTrafficMap = ref<Record<string, NetworkTrafficStats>>({
+  'net-default': {
+    rxTotal: '148.6 GB',
+    txTotal: '216.4 GB',
+    rxSpeed: '18.2 MB/s',
+    txSpeed: '24.6 MB/s',
+  },
+  'net-office': {
+    rxTotal: '1.42 TB',
+    txTotal: '2.85 TB',
+    rxSpeed: '120.5 MB/s',
+    txSpeed: '184.2 MB/s',
+  },
+  'net-homelab': {
+    rxTotal: '54.2 GB',
+    txTotal: '78.1 GB',
+    rxSpeed: '6.4 MB/s',
+    txSpeed: '9.1 MB/s',
+  },
+})
+
+const currentTraffic = computed(() => {
+  return (
+    networkTrafficMap.value[currentNetworkId.value] || {
+      rxTotal: '148.6 GB',
+      txTotal: '216.4 GB',
+      rxSpeed: '18.2 MB/s',
+      txSpeed: '24.6 MB/s',
+    }
+  )
 })
 
 // 网络切换下拉框与新建网络模态框
@@ -360,6 +402,29 @@ const globeDevices = computed<GlobeDevice[]>(() => {
     latencyMs: n.latencyMs,
     natType: n.natType,
   }))
+})
+
+// 网络运行态指标动态汇总 (在线节点、平均延迟、打洞成功率)
+const onlineNodesCount = computed(() => nodes.value.filter((n) => n.status === 'online').length)
+const totalNodesCount = computed(() => nodes.value.length)
+const onlinePercentage = computed(() => {
+  if (!totalNodesCount.value) return 0
+  return Math.round((onlineNodesCount.value / totalNodesCount.value) * 100)
+})
+
+const avgLatency = computed(() => {
+  const onlineWithLat = nodes.value.filter((n) => n.status === 'online' && n.latencyMs > 0)
+  if (!onlineWithLat.length) return 24
+  const sum = onlineWithLat.reduce((acc, cur) => acc + cur.latencyMs, 0)
+  return Math.round(sum / onlineWithLat.length)
+})
+
+const p2pNodesCount = computed(() => nodes.value.filter((n) => n.status === 'online' && n.connection.includes('直连')).length)
+const relayNodesCount = computed(() => nodes.value.filter((n) => n.status === 'online' && !n.connection.includes('直连')).length)
+const p2pSuccessRate = computed(() => {
+  const total = onlineNodesCount.value
+  if (!total) return '75.0'
+  return ((p2pNodesCount.value / total) * 100).toFixed(1)
 })
 
 // --- UI 状态控制 ---
@@ -1200,36 +1265,164 @@ const runAllTests = () => {
           </div>
         </header>
 
-        <!-- 当前网络核心关键参数卡片 -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5">
-          <div class="p-4 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] space-y-1 shadow-2xs">
-            <span class="text-xs text-gray-500">虚拟 IPv4 广播网段</span>
-            <div class="text-base font-bold font-mono text-gray-900 dark:text-white">{{ currentNetwork.ipv4Cidr }}</div>
-            <span class="text-[10px] text-emerald-600">DHCP 动态分配池正常</span>
+        <!-- 当前网络核心关键参数与流量指标监控看板 (8 大子板块矩阵) -->
+        <div class="grid grid-cols-2 md:grid-cols-4 2xl:grid-cols-8 gap-3">
+          <!-- 1. 在线节点数量 -->
+          <div class="p-3.5 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all">
+            <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+              <span>在线节点数量</span>
+              <div class="p-1 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+                <Server class="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div class="mt-2 flex items-baseline gap-1.5">
+              <span class="text-xl font-bold font-mono text-gray-900 dark:text-white">{{ onlineNodesCount }}</span>
+              <span class="text-xs text-gray-400 font-normal">/ {{ totalNodesCount }} 台</span>
+            </div>
+            <div class="mt-2 flex items-center justify-between text-[11px]">
+              <span class="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>在线率 {{ onlinePercentage }}%</span>
+              </span>
+              <span class="text-gray-400 dark:text-gray-500">{{ totalNodesCount - onlineNodesCount }} 离线</span>
+            </div>
           </div>
-          <div class="p-4 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] space-y-1 shadow-2xs">
-            <span class="text-xs text-gray-500">虚拟 IPv6 独占网段</span>
-            <div class="text-base font-bold font-mono text-gray-900 dark:text-white truncate">{{ currentNetwork.ipv6Cidr }}</div>
-            <span class="text-[10px] text-blue-600">原生双栈支持</span>
+
+          <!-- 2. 平均链路延迟 -->
+          <div class="p-3.5 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all">
+            <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+              <span>平均链路延迟</span>
+              <div class="p-1 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
+                <Clock class="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div class="mt-2 flex items-baseline gap-1">
+              <span class="text-xl font-bold font-mono text-gray-900 dark:text-white">{{ avgLatency }}</span>
+              <span class="text-xs text-gray-400 font-normal">ms</span>
+            </div>
+            <div class="mt-2 flex items-center justify-between text-[11px]">
+              <span class="text-blue-600 dark:text-blue-400 font-medium">全网直连优良</span>
+              <span class="text-gray-400 dark:text-gray-500">抖动 ±3ms</span>
+            </div>
           </div>
-          <div class="p-4 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] space-y-1 shadow-2xs">
-            <span class="text-xs text-gray-500">P2P 直连打洞成功率</span>
-            <div class="text-base font-bold text-emerald-600">75.0% (3/4 直连)</div>
-            <span class="text-[10px] text-gray-400">平均链路延时 24ms</span>
+
+          <!-- 3. 入网总流量 (RX) -->
+          <div class="p-3.5 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all">
+            <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+              <span>入网总流量 (RX)</span>
+              <div class="p-1 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+                <ArrowDownLeft class="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div class="mt-2">
+              <span class="text-xl font-bold font-mono text-gray-900 dark:text-white">{{ currentTraffic.rxTotal }}</span>
+            </div>
+            <div class="mt-2 flex items-center justify-between text-[11px]">
+              <span class="text-emerald-600 dark:text-emerald-400 font-mono font-medium">↑ {{ currentTraffic.rxSpeed }}</span>
+              <span class="text-gray-400 dark:text-gray-500">今日累计</span>
+            </div>
           </div>
-          <div class="p-4 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] space-y-1 shadow-2xs">
-            <span class="text-xs text-gray-500">网络加入令牌 (PSK)</span>
-            <div class="flex items-center justify-between">
-              <span class="text-sm font-mono text-gray-800 dark:text-gray-200">
+
+          <!-- 4. 出网总流量 (TX) -->
+          <div class="p-3.5 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all">
+            <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+              <span>出网总流量 (TX)</span>
+              <div class="p-1 rounded-md bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400">
+                <ArrowUpRight class="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div class="mt-2">
+              <span class="text-xl font-bold font-mono text-gray-900 dark:text-white">{{ currentTraffic.txTotal }}</span>
+            </div>
+            <div class="mt-2 flex items-center justify-between text-[11px]">
+              <span class="text-sky-600 dark:text-sky-400 font-mono font-medium">↓ {{ currentTraffic.txSpeed }}</span>
+              <span class="text-gray-400 dark:text-gray-500">今日累计</span>
+            </div>
+          </div>
+
+          <!-- 5. P2P 打洞直连率 -->
+          <div class="p-3.5 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all">
+            <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+              <span>P2P 直连打洞率</span>
+              <div class="p-1 rounded-md bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
+                <Zap class="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div class="mt-2 flex items-baseline gap-1">
+              <span class="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400">{{ p2pSuccessRate }}%</span>
+            </div>
+            <div class="mt-2 flex items-center justify-between text-[11px] text-gray-400 dark:text-gray-500">
+              <span>{{ p2pNodesCount }} 节点直连</span>
+              <span>{{ relayNodesCount }} 中继</span>
+            </div>
+          </div>
+
+          <!-- 6. 虚拟 IPv4 广播网段 -->
+          <div class="p-3.5 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all">
+            <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+              <span>虚拟 IPv4 网段</span>
+              <div class="p-1 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+                <Network class="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div class="mt-2">
+              <span class="text-base font-bold font-mono text-gray-900 dark:text-white truncate block">{{ currentNetwork.ipv4Cidr }}</span>
+            </div>
+            <div class="mt-2 flex items-center justify-between text-[11px]">
+              <span class="text-emerald-600 dark:text-emerald-400 font-medium">DHCP 分配正常</span>
+              <span class="text-gray-400 font-mono">/24</span>
+            </div>
+          </div>
+
+          <!-- 7. 虚拟 IPv6 独占网段 -->
+          <div class="p-3.5 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all">
+            <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+              <span>虚拟 IPv6 网段</span>
+              <div class="p-1 rounded-md bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
+                <Radio class="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div class="mt-2">
+              <span class="text-base font-bold font-mono text-gray-900 dark:text-white truncate block" :title="currentNetwork.ipv6Cidr">{{ currentNetwork.ipv6Cidr }}</span>
+            </div>
+            <div class="mt-2 flex items-center justify-between text-[11px]">
+              <span class="text-blue-600 dark:text-blue-400 font-medium">原生双栈支持</span>
+              <span class="text-gray-400 font-mono">/64</span>
+            </div>
+          </div>
+
+          <!-- 8. 网络加入令牌 (PSK) -->
+          <div class="p-3.5 rounded-xl border border-gray-200 dark:border-[#2f2e2e] bg-white dark:bg-[#252424] flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all">
+            <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+              <span>网络加入令牌 (PSK)</span>
+              <div class="p-1 rounded-md bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400">
+                <Key class="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div class="mt-2 flex items-center justify-between">
+              <span class="text-sm font-mono text-gray-800 dark:text-gray-200 truncate max-w-[100px]">
                 {{ showNetworkSecret ? currentNetwork.secretKey : '••••••••••••' }}
               </span>
-              <button type="button" @click="showNetworkSecret = !showNetworkSecret" class="text-gray-400 hover:text-gray-600">
+              <button
+                type="button"
+                @click="showNetworkSecret = !showNetworkSecret"
+                class="p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
+                title="显示/隐藏密钥"
+              >
                 <component :is="showNetworkSecret ? EyeOff : Eye" class="w-3.5 h-3.5" />
               </button>
             </div>
-            <button type="button" @click="copyText(currentNetwork.secretKey, '网络加入密钥')" class="text-[10px] text-blue-600 hover:underline">
-              复制入网密钥
-            </button>
+            <div class="mt-2 flex items-center justify-between text-[11px]">
+              <button
+                type="button"
+                @click="copyText(currentNetwork.secretKey, '网络加入密钥')"
+                class="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer font-medium"
+              >
+                <Copy class="w-3 h-3" />
+                <span>复制密钥</span>
+              </button>
+              <span class="text-emerald-600 dark:text-emerald-400">已保护</span>
+            </div>
           </div>
         </div>
 
